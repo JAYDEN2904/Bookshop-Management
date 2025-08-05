@@ -1,0 +1,634 @@
+import React, { useState } from 'react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Upload, 
+  Download, 
+  GraduationCap,
+  Edit,
+  Trash2,
+  FileSpreadsheet,
+  Users,
+  Loader2
+} from 'lucide-react';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
+import { Student } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { useStudentContext } from '../../contexts/StudentContext';
+import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
+const PAGE_SIZE = 10;
+
+const StudentsPage: React.FC = () => {
+  const { user } = useAuth();
+  const {
+    students,
+    isLoading,
+    error,
+    addStudent,
+    editStudent,
+    importStudentsFromExcel,
+    getStudentsByClass,
+    searchStudents,
+    getStudentById,
+    getPurchaseHistory
+  } = useStudentContext();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    class: '',
+    rollNumber: ''
+  });
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<Student[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const classes = ['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'];
+
+  // Filtering and searching
+  const filteredStudents = (searchTerm ? searchStudents(searchTerm) : students)
+    .filter(student => !selectedClass || student.class === selectedClass);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredStudents.length / PAGE_SIZE);
+  const paginatedStudents = filteredStudents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Bulk selection logic
+  const isAllSelected = paginatedStudents.length > 0 && paginatedStudents.every(s => selectedStudentIds.includes(s.id));
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedStudentIds(selectedStudentIds.filter(id => !paginatedStudents.some(s => s.id === id)));
+    } else {
+      setSelectedStudentIds([
+        ...selectedStudentIds,
+        ...paginatedStudents.filter(s => !selectedStudentIds.includes(s.id)).map(s => s.id)
+      ]);
+    }
+  };
+  const toggleSelectOne = (id: string) => {
+    setSelectedStudentIds(selectedStudentIds.includes(id)
+      ? selectedStudentIds.filter(sid => sid !== id)
+      : [...selectedStudentIds, id]);
+  };
+  const clearSelection = () => setSelectedStudentIds([]);
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete the selected students?')) return;
+    setBulkActionLoading(true);
+    try {
+      for (const id of selectedStudentIds) {
+        // In a real app, call a deleteStudent function here
+        // For now, just filter them out
+        await editStudent(id, { name: '[DELETED]' }); // Simulate delete
+      }
+      toast.success('Selected students deleted');
+      clearSelection();
+    } catch {
+      toast.error('Failed to delete students');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Bulk edit (change class)
+  const handleBulkEditClass = async (newClass: string) => {
+    setBulkActionLoading(true);
+    try {
+      for (const id of selectedStudentIds) {
+        await editStudent(id, { class: newClass });
+      }
+      toast.success('Class updated for selected students');
+      clearSelection();
+    } catch {
+      toast.error('Failed to update class');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Export to Excel
+  const handleExportExcel = () => {
+    const exportData = filteredStudents.map(s => ({
+      Name: s.name,
+      Class: s.class,
+      'Roll Number': s.rollNumber,
+      'Joined': s.createdAt
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'students.xlsx');
+  };
+
+  const isAdmin = user?.role === 'admin';
+
+  // Handlers
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.class || !formData.rollNumber) {
+      toast.error('Please fill all fields');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await addStudent(formData);
+      toast.success('Student added successfully');
+      setShowAddModal(false);
+      setFormData({ name: '', class: '', rollNumber: '' });
+    } catch {
+      toast.error('Failed to add student');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+    setActionLoading(true);
+    try {
+      await editStudent(selectedStudent.id, formData);
+      toast.success('Student updated successfully');
+      setShowEditModal(false);
+      setSelectedStudent(null);
+      setFormData({ name: '', class: '', rollNumber: '' });
+    } catch {
+      toast.error('Failed to update student');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Excel parsing and preview
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null);
+    setImportPreview([]);
+    const file = e.target.files?.[0] || null;
+    setImportFile(file);
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const preview: Student[] = [];
+        workbook.SheetNames.forEach((sheetName) => {
+          const ws = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+          if (rows.length < 2) return; // skip if no data
+          const headers = rows[0].map((h: any) => (h || '').toString().toLowerCase());
+          const nameIdx = headers.findIndex((h: string) => h.includes('name'));
+          const rollIdx = headers.findIndex((h: string) => h.includes('roll'));
+          if (nameIdx === -1 || rollIdx === -1) {
+            setImportError(`Sheet "${sheetName}" missing required columns (Name, Roll Number)`);
+            return;
+          }
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row[nameIdx] || !row[rollIdx]) continue;
+            preview.push({
+              id: `${sheetName}-${i}-${row[rollIdx]}`,
+              name: row[nameIdx],
+              class: sheetName,
+              rollNumber: row[rollIdx],
+              createdAt: new Date().toISOString()
+            });
+          }
+        });
+        if (preview.length === 0) {
+          setImportError('No valid students found in the file.');
+        }
+        setImportPreview(preview);
+      } catch (err) {
+        setImportError('Failed to parse Excel file.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleImportExcel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile || importPreview.length === 0) {
+      toast.error('Please select a valid file and preview students.');
+      return;
+    }
+    setImportLoading(true);
+    try {
+      // Simulate import for each student in preview
+      for (const student of importPreview) {
+        await addStudent({ name: student.name, class: student.class, rollNumber: student.rollNumber });
+      }
+      toast.success('Students imported successfully');
+      setShowImportModal(false);
+      setImportFile(null);
+      setImportPreview([]);
+    } catch {
+      toast.error('Failed to import students');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const openEditModal = (student: Student) => {
+    setSelectedStudent(student);
+    setFormData({
+      name: student.name,
+      class: student.class,
+      rollNumber: student.rollNumber
+    });
+    setShowEditModal(true);
+  };
+
+  const openHistoryModal = (student: Student) => {
+    setSelectedStudent(student);
+    setShowHistoryModal(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Students Management</h1>
+          <p className="text-gray-600">{isAdmin ? 'Manage student information and class lists' : 'View students by class'}</p>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleExportExcel} title="Export students to Excel">
+            <Download className="h-4 w-4 mr-2" />
+            Export Excel
+          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" onClick={() => setShowImportModal(true)} title="Import students from Excel">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button onClick={() => setShowAddModal(true)} title="Add a new student">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {isAdmin && selectedStudentIds.length > 0 && (
+        <div className="flex items-center space-x-4 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+          <span>{selectedStudentIds.length} selected</span>
+          <Button size="sm" variant="danger" loading={bulkActionLoading} onClick={handleBulkDelete} title="Delete selected students">Delete</Button>
+          <select
+            className="px-2 py-1 border border-gray-300 rounded-md"
+            onChange={e => e.target.value && handleBulkEditClass(e.target.value)}
+            defaultValue=""
+            title="Change class for selected students"
+          >
+            <option value="">Change Class</option>
+            {classes.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <Button size="sm" variant="outline" onClick={clearSelection}>Clear</Button>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search students..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            icon={<Search className="h-4 w-4 text-gray-400" />}
+          />
+        </div>
+        <select
+          value={selectedClass}
+          onChange={(e) => { setSelectedClass(e.target.value); setCurrentPage(1); }}
+          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All Classes</option>
+          {classes.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <Button variant="outline" title="Filter students by class or search">
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+        </Button>
+      </div>
+
+      {/* Students Table (paginated, with checkboxes) */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              {isAdmin && <th className="px-4 py-3"><input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} /></th>}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {paginatedStudents.length ? (
+              paginatedStudents.map((student) => (
+                <tr key={student.id} className="hover:bg-gray-50">
+                  {isAdmin && <td className="px-4 py-4"><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={() => toggleSelectOne(student.id)} /></td>}
+                  <td className="px-6 py-4 whitespace-nowrap">{student.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{student.rollNumber}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{student.class}</td>
+                  <td className="px-6 py-4 whitespace-nowrap space-x-2">
+                    {isAdmin && (
+                      <Button size="sm" variant="outline" onClick={() => openEditModal(student)} title="Edit student">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => openHistoryModal(student)} title="View purchase history">
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={isAdmin ? 5 : 4} className="px-6 py-4 text-gray-400 text-center">No students found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center space-x-2 mt-4">
+          <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <Button size="sm" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+        </div>
+      )}
+
+      {/* Add Student Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          setFormData({ name: '', class: '', rollNumber: '' });
+        }}
+        title="Add Student"
+        size="md"
+      >
+        <form onSubmit={handleAddStudent} className="space-y-4">
+          <Input
+            label="Name"
+            placeholder="Enter student name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <select
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            value={formData.class}
+            onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+            required
+          >
+            <option value="">Select Class</option>
+            {classes.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <Input
+            label="Roll Number"
+            placeholder="Enter roll number"
+            value={formData.rollNumber}
+            onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+            required
+          />
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button type="button" variant="outline" onClick={() => {
+              setShowAddModal(false);
+              setFormData({ name: '', class: '', rollNumber: '' });
+            }}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={actionLoading}>Add Student</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Student Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedStudent(null);
+          setFormData({ name: '', class: '', rollNumber: '' });
+        }}
+        title="Edit Student"
+        size="md"
+      >
+        <form onSubmit={handleEditStudent} className="space-y-4">
+          <Input
+            label="Name"
+            placeholder="Enter student name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <select
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            value={formData.class}
+            onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+            required
+          >
+            <option value="">Select Class</option>
+            {classes.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <Input
+            label="Roll Number"
+            placeholder="Enter roll number"
+            value={formData.rollNumber}
+            onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+            required
+          />
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button type="button" variant="outline" onClick={() => {
+              setShowEditModal(false);
+              setSelectedStudent(null);
+              setFormData({ name: '', class: '', rollNumber: '' });
+            }}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={actionLoading}>Update Student</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Import Students Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setImportFile(null);
+          setImportPreview([]);
+          setImportError(null);
+        }}
+        title="Import Students from Excel"
+        size="md"
+      >
+        <form onSubmit={handleImportExcel} className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 mb-2">Excel Format Instructions:</h4>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Each sheet should represent a class (e.g., "Class 10", "Class 9")</li>
+              <li>• Each row should contain: Name, Roll Number</li>
+              <li>• First row should be headers: "Name", "Roll Number"</li>
+              <li>• Save file as .xlsx or .xls format</li>
+            </ul>
+          </div>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelFileChange}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            required
+          />
+          {importError && <div className="text-red-600 text-sm">{importError}</div>}
+          {importPreview.length > 0 && !importError && (
+            <div className="max-h-48 overflow-y-auto border rounded-md mt-2">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-2 py-1">Name</th>
+                    <th className="px-2 py-1">Class</th>
+                    <th className="px-2 py-1">Roll Number</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.map((s, i) => (
+                    <tr key={s.id + i}>
+                      <td className="px-2 py-1">{s.name}</td>
+                      <td className="px-2 py-1">{s.class}</td>
+                      <td className="px-2 py-1">{s.rollNumber}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button type="button" variant="outline" onClick={() => {
+              setShowImportModal(false);
+              setImportFile(null);
+              setImportPreview([]);
+              setImportError(null);
+            }}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={importLoading} disabled={!!importError || importPreview.length === 0}>Import</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Student Purchase History Modal */}
+      <Modal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedStudent(null);
+        }}
+        title={`Purchase History - ${selectedStudent?.name || ''}`}
+        size="lg"
+      >
+        {selectedStudent && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900">{selectedStudent.name}</h4>
+              <p className="text-gray-600">Class: {selectedStudent.class} | Roll: {selectedStudent.rollNumber}</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cashier</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getPurchaseHistory(selectedStudent.id).length ? (
+                    getPurchaseHistory(selectedStudent.id).map((purchase) => (
+                      <tr key={purchase.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(purchase.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {purchase.items.map(item => `${item.title} (x${item.quantity})`).join(', ')}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">₵{purchase.total}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{purchase.paymentMode}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{purchase.cashierName}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-4 text-gray-400 text-center">No purchases found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end pt-4">
+              <Button variant="outline" onClick={() => {
+                setShowHistoryModal(false);
+                setSelectedStudent(null);
+              }}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+export default StudentsPage;
