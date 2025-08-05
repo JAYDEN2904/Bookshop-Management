@@ -21,11 +21,11 @@ const mockClasses = [
 ];
 
 const mockStudents = [
-  { id: '1', name: 'Ama Mensah', class: 'Class 10', rollNumber: '10A01' },
-  { id: '2', name: 'Kwame Boateng', class: 'Class 9', rollNumber: '9B15' },
-  { id: '3', name: 'Akosua Owusu', class: 'Class 8', rollNumber: '8C22' },
-  { id: '4', name: 'Yaw Ofori', class: 'Class 10', rollNumber: '10A02' },
-  { id: '5', name: 'Efua Asante', class: 'Class 9', rollNumber: '9B16' },
+  { id: '1', name: 'Ama Mensah', class: 'Class 10', studentId: '10A01' },
+  { id: '2', name: 'Kwame Boateng', class: 'Class 9', studentId: '9B15' },
+  { id: '3', name: 'Akosua Owusu', class: 'Class 8', studentId: '8C22' },
+  { id: '4', name: 'Yaw Ofori', class: 'Class 10', studentId: '10A02' },
+  { id: '5', name: 'Efua Asante', class: 'Class 9', studentId: '9B16' },
 ];
 
 // Mock data for books (with stock and price)
@@ -164,7 +164,7 @@ const StudentPurchasePage: React.FC = () => {
     (student) =>
       (!selectedClass || student.class === selectedClass) &&
       (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+        (student.studentId && student.studentId.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   // Filter books for inventory modal
@@ -317,7 +317,7 @@ const StudentPurchasePage: React.FC = () => {
 
   // WhatsApp message generator
   const getWhatsAppMessage = (receipt: any) => {
-    let msg = `Bookshop Receipt\nReceipt ID: ${receipt.id}\nDate: ${receipt.date}\nStudent: ${receipt.student?.name} (${receipt.student?.class}, ${receipt.student?.rollNumber})\n\nItems:`;
+    let msg = `Bookshop Receipt\nReceipt ID: ${receipt.id}\nDate: ${receipt.date}\nStudent: ${receipt.student?.name} (${receipt.student?.class}, ${receipt.student?.studentId})\n\nItems:`;
     receipt.items.forEach((item: any) => {
       msg += `\n- ${item.title} x${item.quantity} (₵${item.price * item.quantity})`;
     });
@@ -402,7 +402,7 @@ const StudentPurchasePage: React.FC = () => {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">{selectedStudent.name}</p>
-                    <p className="text-sm text-gray-600">{selectedStudent.class} - Roll No: {selectedStudent.rollNumber}</p>
+                    <p className="text-sm text-gray-600">{selectedStudent.class} - Student ID: {selectedStudent.studentId}</p>
                   </div>
                 </div>
               </div>
@@ -608,7 +608,7 @@ const StudentPurchasePage: React.FC = () => {
                 <div className="text-xs text-gray-500 font-semibold mb-1">Billed To</div>
                 <div className="font-semibold text-gray-900">{lastReceipt.student?.name}</div>
                 <div className="text-xs text-gray-600">Class: {lastReceipt.student?.class}</div>
-                <div className="text-xs text-gray-600">Roll No: {lastReceipt.student?.rollNumber}</div>
+                <div className="text-xs text-gray-600">Student ID: {lastReceipt.student?.studentId}</div>
               </div>
               <div className="flex flex-col items-end justify-between">
                 <div className="flex items-center space-x-2 mb-2">
@@ -753,7 +753,7 @@ const StudentPurchasePage: React.FC = () => {
                 className="w-full text-left p-3 hover:bg-gray-50 rounded-lg border border-gray-200"
               >
                 <p className="font-medium text-gray-900">{student.name}</p>
-                <p className="text-sm text-gray-600">{student.class} - Roll No: {student.rollNumber}</p>
+                <p className="text-sm text-gray-600">{student.class} - Student ID: {student.studentId}</p>
               </button>
             ))}
           </div>

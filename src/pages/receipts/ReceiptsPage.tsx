@@ -9,13 +9,16 @@ import {
   Calendar,
   DollarSign,
   User,
-  Printer
+  Printer,
+  Users,
+  Globe
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import { Purchase } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const mockReceipts: Purchase[] = [
@@ -62,24 +65,63 @@ const mockReceipts: Purchase[] = [
     cashierId: '3',
     cashierName: 'Mike Johnson',
     createdAt: '2024-01-14T16:45:00'
+  },
+  {
+    id: 'RCP004',
+    studentId: '4',
+    studentName: 'Sneha Patel',
+    items: [
+      { bookId: '1', title: 'Mathematics Class 10', quantity: 1, price: 150, total: 150 },
+      { bookId: '6', title: 'Physics Class 11', quantity: 1, price: 180, total: 180 }
+    ],
+    total: 330,
+    discount: 0,
+    paymentMode: 'cash',
+    cashierId: '4',
+    cashierName: 'John Smith',
+    createdAt: '2024-01-14T14:20:00'
+  },
+  {
+    id: 'RCP005',
+    studentId: '5',
+    studentName: 'Kavya Reddy',
+    items: [
+      { bookId: '7', title: 'Chemistry Class 12', quantity: 1, price: 200, total: 200 }
+    ],
+    total: 200,
+    discount: 15,
+    paymentMode: 'upi',
+    cashierId: '2',
+    cashierName: 'Sarah Cashier',
+    createdAt: '2024-01-13T11:30:00'
   }
 ];
 
 const ReceiptsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [cashierFilter, setCashierFilter] = useState('all');
   const [selectedReceipt, setSelectedReceipt] = useState<Purchase | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showResendModal, setShowResendModal] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Get unique cashiers for admin filtering
+  const uniqueCashiers = Array.from(new Set(mockReceipts.map(r => r.cashierName)));
 
   const filteredReceipts = mockReceipts.filter(receipt => {
     const matchesSearch = receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         receipt.studentName.toLowerCase().includes(searchTerm.toLowerCase());
+                         receipt.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (isAdmin && receipt.cashierName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesPayment = paymentFilter === 'all' || receipt.paymentMode === paymentFilter;
+    const matchesCashier = cashierFilter === 'all' || receipt.cashierName === cashierFilter;
     
     // Date filtering logic would go here
-    return matchesSearch && matchesPayment;
+    return matchesSearch && matchesPayment && matchesCashier;
   });
 
   const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
@@ -96,6 +138,10 @@ const ReceiptsPage: React.FC = () => {
     setSelectedReceipt(null);
   };
 
+  const handleExportAll = () => {
+    toast.success('Exporting all receipts...');
+  };
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -110,12 +156,22 @@ const ReceiptsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Receipts</h1>
-          <p className="text-gray-600">View and manage transaction receipts</p>
+          <p className="text-gray-600">
+            {isAdmin ? 'Global receipt management across all users' : 'View and manage transaction receipts'}
+          </p>
         </div>
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export All
-        </Button>
+        <div className="flex space-x-2">
+          {isAdmin && (
+            <Button variant="outline">
+              <Globe className="h-4 w-4 mr-2" />
+              Global Search
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleExportAll}>
+            <Download className="h-4 w-4 mr-2" />
+            Export All
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -174,7 +230,7 @@ const ReceiptsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search by receipt ID or student name..."
+              placeholder={isAdmin ? "Search by receipt ID, student name, or cashier..." : "Search by receipt ID or student name..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               icon={<Search className="h-4 w-4 text-gray-400" />}
@@ -201,11 +257,57 @@ const ReceiptsPage: React.FC = () => {
             <option value="card">Card</option>
             <option value="upi">UPI</option>
           </select>
-          <Button variant="outline">
+          {isAdmin && (
+            <select
+              value={cashierFilter}
+              onChange={(e) => setCashierFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Cashiers</option>
+              {uniqueCashiers.map(cashier => (
+                <option key={cashier} value={cashier}>{cashier}</option>
+              ))}
+            </select>
+          )}
+          <Button 
+            variant="outline" 
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
             <Filter className="h-4 w-4 mr-2" />
-            More Filters
+            {showAdvancedFilters ? 'Hide' : 'More'} Filters
           </Button>
         </div>
+
+        {/* Advanced Filters (Admin Only) */}
+        {isAdmin && showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Range</label>
+                <div className="flex space-x-2">
+                  <Input placeholder="Min" type="number" />
+                  <Input placeholder="Max" type="number" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount Applied</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="all">All</option>
+                  <option value="with_discount">With Discount</option>
+                  <option value="without_discount">Without Discount</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Items Count</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="all">All</option>
+                  <option value="single_item">Single Item</option>
+                  <option value="multiple_items">Multiple Items</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Receipts Table */}
@@ -229,9 +331,11 @@ const ReceiptsPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cashier
-                </th>
+                {isAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cashier
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -273,9 +377,11 @@ const ReceiptsPage: React.FC = () => {
                         {receipt.paymentMode}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {receipt.cashierName}
-                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {receipt.cashierName}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <button
                         onClick={() => {

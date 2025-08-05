@@ -33,6 +33,7 @@ const StudentsPage: React.FC = () => {
     error,
     addStudent,
     editStudent,
+    deleteStudent,
     importStudentsFromExcel,
     getStudentsByClass,
     searchStudents,
@@ -50,7 +51,7 @@ const StudentsPage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     class: '',
-    rollNumber: ''
+    studentId: ''
   });
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<Student[]>([]);
@@ -96,9 +97,7 @@ const StudentsPage: React.FC = () => {
     setBulkActionLoading(true);
     try {
       for (const id of selectedStudentIds) {
-        // In a real app, call a deleteStudent function here
-        // For now, just filter them out
-        await editStudent(id, { name: '[DELETED]' }); // Simulate delete
+        await deleteStudent(id);
       }
       toast.success('Selected students deleted');
       clearSelection();
@@ -130,7 +129,7 @@ const StudentsPage: React.FC = () => {
     const exportData = filteredStudents.map(s => ({
       Name: s.name,
       Class: s.class,
-      'Roll Number': s.rollNumber,
+      'Student ID': s.studentId || 'N/A',
       'Joined': s.createdAt
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -145,7 +144,7 @@ const StudentsPage: React.FC = () => {
   // Handlers
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.class || !formData.rollNumber) {
+    if (!formData.name || !formData.class || !formData.studentId) {
       toast.error('Please fill all fields');
       return;
     }
@@ -154,7 +153,7 @@ const StudentsPage: React.FC = () => {
       await addStudent(formData);
       toast.success('Student added successfully');
       setShowAddModal(false);
-      setFormData({ name: '', class: '', rollNumber: '' });
+      setFormData({ name: '', class: '', studentId: '' });
     } catch {
       toast.error('Failed to add student');
     } finally {
@@ -171,7 +170,7 @@ const StudentsPage: React.FC = () => {
       toast.success('Student updated successfully');
       setShowEditModal(false);
       setSelectedStudent(null);
-      setFormData({ name: '', class: '', rollNumber: '' });
+      setFormData({ name: '', class: '', studentId: '' });
     } catch {
       toast.error('Failed to update student');
     } finally {
@@ -190,37 +189,238 @@ const StudentsPage: React.FC = () => {
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Try different XLSX reading options for better compatibility
+        let workbook;
+        try {
+          workbook = XLSX.read(data, { 
+            type: 'array',
+            cellDates: true,
+            cellNF: false,
+            cellText: false,
+            raw: false
+          });
+        } catch (err) {
+          console.log('First attempt failed, trying with different options:', err);
+          try {
+            workbook = XLSX.read(data, { 
+              type: 'array',
+              cellDates: false,
+              cellNF: false,
+              cellText: true,
+              raw: true
+            });
+          } catch (err2) {
+            console.log('Second attempt failed, trying basic options:', err2);
+            workbook = XLSX.read(data, { type: 'array' });
+          }
+        }
         const preview: Student[] = [];
+        
+        console.log('Available sheets:', workbook.SheetNames);
+        console.log('Workbook structure:', workbook);
+        console.log('Workbook keys:', Object.keys(workbook));
+        console.log('Workbook Sheets:', workbook.Sheets);
+        
         workbook.SheetNames.forEach((sheetName) => {
           const ws = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-          if (rows.length < 2) return; // skip if no data
-          const headers = rows[0].map((h: any) => (h || '').toString().toLowerCase());
-          const nameIdx = headers.findIndex((h: string) => h.includes('name'));
-          const rollIdx = headers.findIndex((h: string) => h.includes('roll'));
-          if (nameIdx === -1 || rollIdx === -1) {
-            setImportError(`Sheet "${sheetName}" missing required columns (Name, Roll Number)`);
+          console.log(`Processing sheet: ${sheetName}`);
+          console.log(`Sheet object:`, ws);
+          
+          // Get the sheet range
+          const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
+          console.log(`Sheet range:`, range);
+          
+          // Extract all cell data directly
+          const rows: any[][] = [];
+          for (let R = range.s.r; R <= range.e.r; ++R) {
+            const row: any[] = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+              const cell_address = XLSX.utils.encode_cell({r: R, c: C});
+              const cell = ws[cell_address];
+              if (cell) {
+                console.log(`Cell ${cell_address}:`, cell);
+                // Handle different cell value formats
+                let cellValue = '';
+                if (typeof cell.v === 'string') {
+                  cellValue = cell.v;
+                } else if (typeof cell.v === 'number') {
+                  cellValue = cell.v.toString();
+                } else if (cell.v !== undefined && cell.v !== null) {
+                  cellValue = cell.v.toString();
+                }
+                row.push(cellValue);
+              } else {
+                row.push('');
+              }
+            }
+            if (row.some(cell => cell !== '')) {
+              rows.push(row);
+            }
+          }
+          
+          console.log(`Extracted rows from "${sheetName}":`, rows);
+          
+          // If no rows found, try alternative parsing method
+          if (rows.length === 0) {
+            console.log(`No rows found, trying alternative parsing method`);
+            try {
+              // Try using sheet_to_json method
+              const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+              console.log(`Alternative method - JSON data:`, jsonData);
+              
+              if (jsonData.length > 0) {
+                rows.push(...jsonData);
+                console.log(`Added ${jsonData.length} rows from alternative method`);
+              }
+            } catch (altErr) {
+              console.log(`Alternative method failed:`, altErr);
+            }
+          }
+          
+          if (rows.length < 2) {
+            console.log(`Skipping sheet "${sheetName}" - not enough rows`);
             return;
           }
-          for (let i = 1; i < rows.length; i++) {
+          
+          // Find the actual header row by looking for meaningful headers
+          let headerRowIndex = 0;
+          let headers: string[] = [];
+          
+          // Look for a row that contains header-like text
+          for (let i = 0; i < Math.min(5, rows.length); i++) {
+            const potentialHeaders = rows[i].map((h: any) => (h || '').toString().toLowerCase());
+            console.log(`Row ${i} potential headers:`, potentialHeaders);
+            
+            // Check if this row contains header-like text
+            const hasNameHeader = potentialHeaders.some(h => 
+              h.includes('name') || h.includes('student') || h.includes('full') || h.includes('first')
+            );
+            const hasIdHeader = potentialHeaders.some(h => 
+              h.includes('student') && h.includes('id') || h.includes('id') || h.includes('roll')
+            );
+            
+            if (hasNameHeader || hasIdHeader) {
+              headerRowIndex = i;
+              headers = potentialHeaders;
+              console.log(`Found header row at index ${i}:`, headers);
+              break;
+            }
+          }
+          
+          // If no proper headers found, assume first row is headers
+          if (headers.length === 0 || headers.every(h => h === '')) {
+            headers = rows[0].map((h: any) => (h || '').toString().toLowerCase());
+            console.log(`Using first row as headers:`, headers);
+          }
+          
+          console.log(`Final headers in "${sheetName}":`, headers);
+          
+          // More flexible column detection for your specific format
+          const nameIdx = headers.findIndex((h: string) => 
+            h.includes('name') && h.includes('of') && h.includes('student')
+          );
+          const studentIdIdx = headers.findIndex((h: string) => 
+            h.includes('student') && h.includes('id') && !h.includes('name')
+          );
+          const classIdx = headers.findIndex((h: string) => 
+            h.includes('class') || h.includes('grade') || h.includes('section') || h.includes('group')
+          );
+          
+          console.log(`Column mapping - nameIdx: ${nameIdx}, studentIdIdx: ${studentIdIdx}, classIdx: ${classIdx}`);
+          console.log(`Headers found: ${headers.join(', ')}`);
+          console.log(`Headers with indices:`);
+          headers.forEach((header, index) => {
+            if (header.trim()) {
+              console.log(`  Index ${index}: "${header}"`);
+            }
+          });
+          
+          console.log(`Found nameIdx: ${nameIdx}, studentIdIdx: ${studentIdIdx}, classIdx: ${classIdx}`);
+          
+          // Check if we have the required columns
+          if (nameIdx === -1) {
+            const errorMsg = `Sheet "${sheetName}" missing "Name" column. Found: ${headers.join(', ')}.`;
+            console.log(errorMsg);
+            setImportError(errorMsg);
+            return;
+          }
+          
+          // If we have student ID but no class, use student ID as class
+          if (studentIdIdx !== -1 && classIdx === -1) {
+            console.log(`Using Student ID as class identifier`);
+          } else if (classIdx === -1) {
+            const errorMsg = `Sheet "${sheetName}" missing "Class" column. Found: ${headers.join(', ')}. Need a column for class/grade/student id.`;
+            console.log(errorMsg);
+            setImportError(errorMsg);
+            return;
+          }
+          
+          for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
-            if (!row[nameIdx] || !row[rollIdx]) continue;
-            preview.push({
-              id: `${sheetName}-${i}-${row[rollIdx]}`,
-              name: row[nameIdx],
-              class: sheetName,
-              rollNumber: row[rollIdx],
+            
+            // If we can't find proper headers, try to infer from data
+            if (nameIdx === -1 && studentIdIdx === -1) {
+              console.log('No proper headers found, using inferred column order...');
+              // Assume first column is Student ID, second is Class, third is Name
+              const inferredNameIdx = 2; // Third column
+              const inferredStudentIdIdx = 0; // First column
+              
+              if (!row[inferredNameIdx] || !row[inferredStudentIdIdx]) {
+                console.log(`Skipping row ${i} - missing data:`, row);
+                continue;
+              }
+              
+              const studentName = row[inferredNameIdx].toString().trim();
+              const studentId = row[inferredStudentIdIdx].toString().trim();
+              
+              const student = {
+                id: `${sheetName}-${i}-${studentId}`,
+                name: studentName,
+                class: sheetName, // Use sheet name as class
+                studentId: studentId, // Store the actual student ID from Excel
+                createdAt: new Date().toISOString()
+              };
+              
+              console.log(`Adding student with inferred mapping:`, student);
+              preview.push(student);
+              continue;
+            }
+            
+            // Use student ID as the class identifier
+            const classColumnIdx = studentIdIdx;
+            
+            if (!row[nameIdx] || !row[classColumnIdx]) {
+              console.log(`Skipping row ${i} - missing data:`, row);
+              continue;
+            }
+            
+            const studentName = row[nameIdx].toString().trim();
+            const studentId = row[classColumnIdx].toString().trim();
+            
+            const student = {
+              id: `${sheetName}-${i}-${studentId}`,
+              name: studentName,
+              class: sheetName, // Use sheet name as class
+              studentId: studentId, // Store the actual student ID from Excel
               createdAt: new Date().toISOString()
-            });
+            };
+            
+            console.log(`Adding student:`, student);
+            preview.push(student);
           }
         });
+        
+        console.log(`Total students found: ${preview.length}`);
+        
         if (preview.length === 0) {
-          setImportError('No valid students found in the file.');
+          setImportError('No valid students found in the file. Please check that your Excel file has columns for "Name" and "Class".');
+        } else {
+          setImportPreview(preview);
         }
-        setImportPreview(preview);
       } catch (err) {
-        setImportError('Failed to parse Excel file.');
+        console.error('Excel parsing error:', err);
+        setImportError(`Failed to parse Excel file: ${err}`);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -236,7 +436,7 @@ const StudentsPage: React.FC = () => {
     try {
       // Simulate import for each student in preview
       for (const student of importPreview) {
-        await addStudent({ name: student.name, class: student.class, rollNumber: student.rollNumber });
+        await addStudent({ name: student.name, class: student.class, studentId: student.studentId });
       }
       toast.success('Students imported successfully');
       setShowImportModal(false);
@@ -251,17 +451,30 @@ const StudentsPage: React.FC = () => {
 
   const openEditModal = (student: Student) => {
     setSelectedStudent(student);
-    setFormData({
-      name: student.name,
-      class: student.class,
-      rollNumber: student.rollNumber
-    });
+            setFormData({
+          name: student.name,
+          class: student.class,
+          studentId: student.studentId || ''
+        });
     setShowEditModal(true);
   };
 
   const openHistoryModal = (student: Student) => {
     setSelectedStudent(student);
     setShowHistoryModal(true);
+  };
+
+  const handleDeleteStudent = async (student: Student) => {
+    if (!window.confirm(`Are you sure you want to delete ${student.name}?`)) return;
+    setActionLoading(true);
+    try {
+      await deleteStudent(student.id);
+      toast.success('Student deleted successfully');
+    } catch {
+      toast.error('Failed to delete student');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -361,7 +574,7 @@ const StudentsPage: React.FC = () => {
             <tr>
               {isAdmin && <th className="px-4 py-3"><input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} /></th>}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll Number</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -372,13 +585,18 @@ const StudentsPage: React.FC = () => {
                 <tr key={student.id} className="hover:bg-gray-50">
                   {isAdmin && <td className="px-4 py-4"><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={() => toggleSelectOne(student.id)} /></td>}
                   <td className="px-6 py-4 whitespace-nowrap">{student.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{student.rollNumber}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{student.studentId || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{student.class}</td>
                   <td className="px-6 py-4 whitespace-nowrap space-x-2">
                     {isAdmin && (
-                      <Button size="sm" variant="outline" onClick={() => openEditModal(student)} title="Edit student">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditModal(student)} title="Edit student">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => handleDeleteStudent(student)} title="Delete student" loading={actionLoading}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                     <Button size="sm" variant="outline" onClick={() => openHistoryModal(student)} title="View purchase history">
                       <FileSpreadsheet className="h-4 w-4" />
@@ -409,7 +627,7 @@ const StudentsPage: React.FC = () => {
         isOpen={showAddModal}
         onClose={() => {
           setShowAddModal(false);
-          setFormData({ name: '', class: '', rollNumber: '' });
+          setFormData({ name: '', class: '', studentId: '' });
         }}
         title="Add Student"
         size="md"
@@ -434,16 +652,16 @@ const StudentsPage: React.FC = () => {
             ))}
           </select>
           <Input
-            label="Roll Number"
-            placeholder="Enter roll number"
-            value={formData.rollNumber}
-            onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+            label="Student ID"
+            placeholder="Enter student ID"
+            value={formData.studentId}
+            onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
             required
           />
           <div className="flex justify-end space-x-4 pt-4">
             <Button type="button" variant="outline" onClick={() => {
               setShowAddModal(false);
-              setFormData({ name: '', class: '', rollNumber: '' });
+              setFormData({ name: '', class: '', studentId: '' });
             }}>
               Cancel
             </Button>
@@ -458,7 +676,7 @@ const StudentsPage: React.FC = () => {
         onClose={() => {
           setShowEditModal(false);
           setSelectedStudent(null);
-          setFormData({ name: '', class: '', rollNumber: '' });
+          setFormData({ name: '', class: '', studentId: '' });
         }}
         title="Edit Student"
         size="md"
@@ -483,17 +701,17 @@ const StudentsPage: React.FC = () => {
             ))}
           </select>
           <Input
-            label="Roll Number"
-            placeholder="Enter roll number"
-            value={formData.rollNumber}
-            onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+            label="Student ID"
+            placeholder="Enter student ID"
+            value={formData.studentId}
+            onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
             required
           />
           <div className="flex justify-end space-x-4 pt-4">
             <Button type="button" variant="outline" onClick={() => {
               setShowEditModal(false);
               setSelectedStudent(null);
-              setFormData({ name: '', class: '', rollNumber: '' });
+              setFormData({ name: '', class: '', studentId: '' });
             }}>
               Cancel
             </Button>
@@ -518,9 +736,10 @@ const StudentsPage: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="font-medium text-blue-900 mb-2">Excel Format Instructions:</h4>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Each sheet should represent a class (e.g., "Class 10", "Class 9")</li>
-              <li>• Each row should contain: Name, Roll Number</li>
-              <li>• First row should be headers: "Name", "Roll Number"</li>
+              <li>• Each sheet name represents the class (e.g., "Class 1", "Class 10")</li>
+              <li>• Each row should contain: Name, Student ID</li>
+              <li>• First row should be headers: "Name", "Student ID"</li>
+              <li>• All students in a sheet will be assigned to that class</li>
               <li>• Save file as .xlsx or .xls format</li>
             </ul>
           </div>
@@ -539,7 +758,7 @@ const StudentsPage: React.FC = () => {
                   <tr>
                     <th className="px-2 py-1">Name</th>
                     <th className="px-2 py-1">Class</th>
-                    <th className="px-2 py-1">Roll Number</th>
+                    <th className="px-2 py-1">Student ID</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -547,7 +766,7 @@ const StudentsPage: React.FC = () => {
                     <tr key={s.id + i}>
                       <td className="px-2 py-1">{s.name}</td>
                       <td className="px-2 py-1">{s.class}</td>
-                      <td className="px-2 py-1">{s.rollNumber}</td>
+                      <td className="px-2 py-1">{s.studentId || 'N/A'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -582,7 +801,7 @@ const StudentsPage: React.FC = () => {
           <div className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-medium text-gray-900">{selectedStudent.name}</h4>
-              <p className="text-gray-600">Class: {selectedStudent.class} | Roll: {selectedStudent.rollNumber}</p>
+              <p className="text-gray-600">Class: {selectedStudent.class} | Student ID: {selectedStudent.studentId || 'N/A'}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">

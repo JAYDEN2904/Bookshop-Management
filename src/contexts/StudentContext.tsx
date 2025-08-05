@@ -8,6 +8,7 @@ interface StudentContextType {
   error: string | null;
   addStudent: (student: Omit<Student, 'id' | 'createdAt'>) => Promise<void>;
   editStudent: (id: string, updates: Partial<Student>) => Promise<void>;
+  deleteStudent: (id: string) => Promise<void>;
   importStudentsFromExcel: (file: File) => Promise<void>;
   getStudentsByClass: (className: string) => Student[];
   searchStudents: (query: string) => Student[];
@@ -27,12 +28,12 @@ export const useStudentContext = () => {
 
 // Mock data for demonstration
 const mockStudents: Student[] = [
-  { id: '1', name: 'Rahul Kumar', class: 'Class 10', rollNumber: '10A01', createdAt: '2024-01-01' },
-  { id: '2', name: 'Priya Sharma', class: 'Class 10', rollNumber: '10A02', createdAt: '2024-01-02' },
-  { id: '3', name: 'Amit Singh', class: 'Class 9', rollNumber: '9B15', createdAt: '2024-01-03' },
-  { id: '4', name: 'Sneha Patel', class: 'Class 9', rollNumber: '9B16', createdAt: '2024-01-04' },
-  { id: '5', name: 'Ravi Gupta', class: 'Class 8', rollNumber: '8C22', createdAt: '2024-01-05' },
-  { id: '6', name: 'Anita Verma', class: 'Class 8', rollNumber: '8C23', createdAt: '2024-01-06' },
+  { id: '1', name: 'Rahul Kumar', class: 'Class 10', studentId: '10A01', createdAt: '2024-01-01' },
+  { id: '2', name: 'Priya Sharma', class: 'Class 10', studentId: '10A02', createdAt: '2024-01-02' },
+  { id: '3', name: 'Amit Singh', class: 'Class 9', studentId: '9B15', createdAt: '2024-01-03' },
+  { id: '4', name: 'Sneha Patel', class: 'Class 9', studentId: '9B16', createdAt: '2024-01-04' },
+  { id: '5', name: 'Ravi Gupta', class: 'Class 8', studentId: '8C22', createdAt: '2024-01-05' },
+  { id: '6', name: 'Anita Verma', class: 'Class 8', studentId: '8C23', createdAt: '2024-01-06' },
 ];
 
 const mockPurchases: Purchase[] = [
@@ -72,10 +73,40 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // Load students from localStorage on mount
   useEffect(() => {
-    setStudents(mockStudents);
+    try {
+      const savedStudents = localStorage.getItem('students');
+      if (savedStudents) {
+        const parsedStudents = JSON.parse(savedStudents);
+        // Migrate old students that might not have studentId
+        const migratedStudents = parsedStudents.map((student: any) => {
+          if (!student.studentId) {
+            // Generate a studentId from the existing data
+            return {
+              ...student,
+              studentId: student.rollNumber || `ID-${student.id}`
+            };
+          }
+          return student;
+        });
+        setStudents(migratedStudents);
+      } else {
+        setStudents(mockStudents);
+      }
+    } catch (err) {
+      console.error('Error loading students from localStorage:', err);
+      setStudents(mockStudents);
+    }
     setIsLoading(false);
   }, []);
+
+  // Save students to localStorage whenever students change
+  useEffect(() => {
+    if (students.length > 0) {
+      localStorage.setItem('students', JSON.stringify(students));
+    }
+  }, [students]);
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt'>) => {
     try {
@@ -100,6 +131,15 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const deleteStudent = async (id: string) => {
+    try {
+      setStudents(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      setError('Failed to delete student');
+      throw err;
+    }
+  };
+
   // Simulate Excel import (admin only)
   const importStudentsFromExcel = async (file: File) => {
     if (user?.role !== 'admin') {
@@ -113,7 +153,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Simulate import by adding a mock student
         setStudents(prev => ([
           ...prev,
-          { id: Date.now().toString(), name: 'Imported Student', class: 'Class 7', rollNumber: '7A99', createdAt: new Date().toISOString() }
+          { id: Date.now().toString(), name: 'Imported Student', class: 'Class 7', studentId: '7A99', createdAt: new Date().toISOString() }
         ]));
         resolve();
       }, 1000);
@@ -127,7 +167,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const searchStudents = (query: string) => {
     return students.filter(s =>
       s.name.toLowerCase().includes(query.toLowerCase()) ||
-      s.rollNumber.toLowerCase().includes(query.toLowerCase())
+      (s.studentId && s.studentId.toLowerCase().includes(query.toLowerCase()))
     );
   };
 
@@ -146,6 +186,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       error,
       addStudent,
       editStudent,
+      deleteStudent,
       importStudentsFromExcel,
       getStudentsByClass,
       searchStudents,

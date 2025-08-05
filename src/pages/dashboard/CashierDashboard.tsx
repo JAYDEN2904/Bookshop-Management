@@ -4,11 +4,49 @@ import {
   AlertTriangle,
   ShoppingCart,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Users,
+  BookOpen,
+  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
+import { useInventory } from '../../contexts/InventoryContext';
+import { Link } from 'react-router-dom';
 
 const CashierDashboard: React.FC = () => {
+  const { books } = useInventory();
+
+  // Get low stock books
+  const lowStockBooks = books.filter(book => book.stock <= book.minStock);
+
+  // Mock today's sales data
+  const todaySales = {
+    total: 8450,
+    transactions: 32,
+    items: 127,
+    growth: 8,
+    averageTransaction: 264
+  };
+
+  // Mock recent transactions
+  const recentTransactions = [
+    { student: 'Rahul Kumar', class: 'Class 10-A', amount: 850, time: '10:30 AM', items: 5 },
+    { student: 'Priya Sharma', class: 'Class 9-B', amount: 650, time: '10:15 AM', items: 4 },
+    { student: 'Amit Singh', class: 'Class 8-C', amount: 1200, time: '09:45 AM', items: 8 },
+    { student: 'Sneha Patel', class: 'Class 11-A', amount: 950, time: '09:30 AM', items: 6 },
+    { student: 'Kavya Reddy', class: 'Class 12-B', amount: 750, time: '09:20 AM', items: 3 }
+  ];
+
+  // Mock top selling items today
+  const topSellingItems = [
+    { title: 'Mathematics - Class 10', sold: 12, revenue: 1800 },
+    { title: 'English Grammar - Class 9', sold: 8, revenue: 960 },
+    { title: 'Science - Class 8', sold: 6, revenue: 720 },
+    { title: 'History - Class 7', sold: 4, revenue: 480 }
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -17,47 +55,38 @@ const CashierDashboard: React.FC = () => {
         <p className="text-gray-600">Your daily sales overview</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Today's Sales</p>
-              <p className="text-2xl font-bold text-gray-900">₵8,450</p>
-              <p className="text-xs text-green-600">32 transactions</p>
+      {/* Today's Sales Summary */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Today's Sales</h3>
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-600">Live updates</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center p-4 bg-green-50 rounded-lg">
+            <p className="text-2xl font-bold text-green-600">₵{todaySales.total.toLocaleString()}</p>
+            <p className="text-sm text-gray-600">Total Sales</p>
+            <div className="flex items-center justify-center mt-1">
+              <ArrowUpRight className="h-3 w-3 text-green-600 mr-1" />
+              <span className="text-xs text-green-600">+{todaySales.growth}%</span>
             </div>
           </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <ShoppingCart className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Items Sold</p>
-              <p className="text-2xl font-bold text-gray-900">127</p>
-              <p className="text-xs text-blue-600">Books & supplies</p>
-            </div>
+          <div className="text-center p-4 bg-blue-50 rounded-lg">
+            <p className="text-2xl font-bold text-blue-600">{todaySales.transactions}</p>
+            <p className="text-sm text-gray-600">Transactions</p>
           </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-900">5</p>
-              <p className="text-xs text-orange-600">Check inventory</p>
-            </div>
+          <div className="text-center p-4 bg-purple-50 rounded-lg">
+            <p className="text-2xl font-bold text-purple-600">{todaySales.items}</p>
+            <p className="text-sm text-gray-600">Items Sold</p>
           </div>
-        </Card>
-      </div>
+          <div className="text-center p-4 bg-orange-50 rounded-lg">
+            <p className="text-2xl font-bold text-orange-600">₵{todaySales.averageTransaction}</p>
+            <p className="text-sm text-gray-600">Avg. Transaction</p>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Transactions */}
@@ -67,19 +96,14 @@ const CashierDashboard: React.FC = () => {
             <Clock className="h-5 w-5 text-gray-400" />
           </div>
           <div className="space-y-4">
-            {[
-                      { student: 'Rahul Kumar', class: 'Class 10-A', amount: '₵850', time: '10:30 AM' },
-        { student: 'Priya Sharma', class: 'Class 9-B', amount: '₵650', time: '10:15 AM' },
-        { student: 'Amit Singh', class: 'Class 8-C', amount: '₵1,200', time: '09:45 AM' },
-        { student: 'Sneha Patel', class: 'Class 11-A', amount: '₵950', time: '09:30 AM' },
-            ].map((transaction, index) => (
+            {recentTransactions.map((transaction, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{transaction.student}</p>
-                  <p className="text-sm text-gray-600">{transaction.class}</p>
+                  <p className="text-sm text-gray-600">{transaction.class} • {transaction.items} items</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-green-600">{transaction.amount}</p>
+                  <p className="font-semibold text-green-600">₵{transaction.amount.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">{transaction.time}</p>
                 </div>
               </div>
@@ -87,6 +111,27 @@ const CashierDashboard: React.FC = () => {
           </div>
         </Card>
 
+        {/* Top Selling Items Today */}
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Top Selling Items Today</h3>
+            <TrendingUp className="h-5 w-5 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            {topSellingItems.map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{item.title}</p>
+                  <p className="text-sm text-gray-600">{item.sold} copies sold</p>
+                </div>
+                <p className="font-semibold text-green-600">₵{item.revenue.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Low Stock Alert */}
         <Card>
           <div className="flex items-center justify-between mb-4">
@@ -94,49 +139,69 @@ const CashierDashboard: React.FC = () => {
             <AlertTriangle className="h-5 w-5 text-orange-500" />
           </div>
           <div className="space-y-4">
-            {[
-              { title: 'Mathematics - Class 10', stock: 3, minStock: 10 },
-              { title: 'Science - Class 9', stock: 5, minStock: 15 },
-              { title: 'English - Class 8', stock: 2, minStock: 12 },
-              { title: 'History - Class 7', stock: 1, minStock: 8 },
-              { title: 'Geography - Class 6', stock: 4, minStock: 10 },
-            ].map((book, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                <div>
-                  <p className="font-medium text-gray-900">{book.title}</p>
-                  <p className="text-sm text-red-600">Only {book.stock} left (Min: {book.minStock})</p>
+            {lowStockBooks.length > 0 ? (
+              lowStockBooks.slice(0, 5).map((book, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div>
+                    <p className="font-medium text-gray-900">{book.title}</p>
+                    <p className="text-sm text-red-600">Only {book.stock} left (Min: {book.minStock})</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-red-700">₵{book.sellingPrice}</p>
+                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                      Low Stock
+                    </span>
+                  </div>
                 </div>
-                <div className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">
-                  Low Stock
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-4">
+                <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-gray-600">All stock levels are good</p>
               </div>
-            ))}
+            )}
+          </div>
+        </Card>
+
+        {/* Quick Access */}
+        <Card>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Access</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Link 
+              to="/purchase"
+              className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center group"
+            >
+              <ShoppingCart className="h-8 w-8 text-blue-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-medium text-gray-900">New Purchase</p>
+              <p className="text-xs text-gray-600 mt-1">Process student purchase</p>
+            </Link>
+            <Link 
+              to="/receipts"
+              className="p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center group"
+            >
+              <Clock className="h-8 w-8 text-green-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-medium text-gray-900">View Receipts</p>
+              <p className="text-xs text-gray-600 mt-1">Today's transactions</p>
+            </Link>
+            <Link 
+              to="/students"
+              className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center group"
+            >
+              <Users className="h-8 w-8 text-purple-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-medium text-gray-900">Students</p>
+              <p className="text-xs text-gray-600 mt-1">Manage students</p>
+            </Link>
+            <Link 
+              to="/inventory"
+              className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-center group"
+            >
+              <BookOpen className="h-8 w-8 text-orange-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-medium text-gray-900">Inventory</p>
+              <p className="text-xs text-gray-600 mt-1">Check stock levels</p>
+            </Link>
           </div>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center">
-            <ShoppingCart className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">New Purchase</p>
-          </button>
-          <button className="p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center">
-            <Clock className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">View Receipts</p>
-          </button>
-          <button className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center">
-            <TrendingUp className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">Sales Report</p>
-          </button>
-          <button className="p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors text-center">
-            <AlertTriangle className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-900">Stock Alerts</p>
-          </button>
-        </div>
-      </Card>
     </div>
   );
 };

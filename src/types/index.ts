@@ -43,7 +43,7 @@ export interface Student {
   id: string;
   name: string;
   class: string;
-  rollNumber: string;
+  studentId: string; // Add this field to store the actual student ID from Excel
   createdAt: string;
 }
 
@@ -90,4 +90,64 @@ export interface BundleItem {
   title: string;
   quantity: number;
   price: number;
+}
+
+export interface SupplyOrder {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  items: SupplyItem[];
+  totalAmount: number;
+  invoiceNumber?: string;
+  supplyDate: string;
+  expectedPaymentDate?: string;
+  status: 'pending' | 'received' | 'cancelled';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface SupplyItem {
+  bookId: string;
+  bookTitle: string;
+  quantity: number;
+  costPrice: number;
+  total: number;
+}
+
+export interface SupplierPayment {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  paymentMethod: 'cash' | 'bank_transfer' | 'cheque' | 'upi';
+  reference: string;
+  paymentDate: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface SupplierLedgerEntry {
+  id: string;
+  supplierId: string;
+  type: 'supply' | 'payment';
+  reference: string;
+  description: string;
+  amount: number;
+  balance: number;
+  date: string;
+}
+
+export interface SupplierAnalytics {
+  totalSupplies: number;
+  totalPayments: number;
+  outstandingBalance: number;
+  averageOrderValue: number;
+  onTimeDeliveryRate: number;
+  reliabilityScore: number;
+  lastOrderDate: string;
+  paymentHistory: {
+    onTime: number;
+    late: number;
+    overdue: number;
+  };
 }

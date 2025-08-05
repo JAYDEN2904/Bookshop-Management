@@ -31,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     { path: '/inventory', label: 'Inventory', icon: Package },
     { path: '/purchase', label: 'Student Purchase', icon: ShoppingCart },
     { path: '/students', label: 'Students', icon: GraduationCap },
+    { path: '/receipts', label: 'Receipts', icon: Receipt },
     { path: '/suppliers', label: 'Suppliers', icon: Truck },
     { path: '/reports', label: 'Reports & Finance', icon: BarChart3 },
     { path: '/users', label: 'User Management', icon: UserCog },

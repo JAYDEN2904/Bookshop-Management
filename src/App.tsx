@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { InventoryProvider } from './contexts/InventoryContext';
 import { StudentProvider } from './contexts/StudentContext';
+import { SupplierProvider } from './contexts/SupplierContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
@@ -51,40 +52,42 @@ function App() {
     <AuthProvider>
       <InventoryProvider>
         <StudentProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              
-              <Route element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/inventory" element={<InventoryPage />} />
-                <Route path="/purchase" element={<StudentPurchasePage />} />
-                <Route path="/students" element={<StudentsPage />} />
-                <Route path="/suppliers" element={
-                  <ProtectedRoute adminOnly>
-                    <SuppliersPage />
+          <SupplierProvider>
+            <Router>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                <Route element={
+                  <ProtectedRoute>
+                    <Layout />
                   </ProtectedRoute>
-                } />
-                <Route path="/reports" element={
-                  <ProtectedRoute adminOnly>
-                    <ReportsPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/users" element={
-                  <ProtectedRoute adminOnly>
-                    <UserManagementPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/receipts" element={<ReceiptsPage />} />
-              </Route>
-            </Routes>
-          </Router>
+                }>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/purchase" element={<StudentPurchasePage />} />
+                  <Route path="/students" element={<StudentsPage />} />
+                  <Route path="/suppliers" element={
+                    <ProtectedRoute adminOnly>
+                      <SuppliersPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/reports" element={
+                    <ProtectedRoute adminOnly>
+                      <ReportsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/users" element={
+                    <ProtectedRoute adminOnly>
+                      <UserManagementPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/receipts" element={<ReceiptsPage />} />
+                </Route>
+              </Routes>
+            </Router>
+          </SupplierProvider>
         </StudentProvider>
       </InventoryProvider>
     </AuthProvider>
