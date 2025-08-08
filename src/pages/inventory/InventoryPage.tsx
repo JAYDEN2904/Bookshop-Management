@@ -7,7 +7,6 @@ import {
   AlertTriangle, 
   History,
   Edit,
-  Trash2,
   RefreshCw,
   Eye,
   AlertCircle
@@ -16,7 +15,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
-import { Book, StockHistory } from '../../types';
+import { Book } from '../../types';
 import { useInventory } from '../../contexts/InventoryContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -24,21 +23,18 @@ const InventoryPage: React.FC = () => {
   const { user } = useAuth();
   const { 
     books, 
-    stockHistory, 
     isLoading, 
     error,
     addBook,
     updateBook,
-    deleteBook,
     addStock,
     markWastage,
-    markReturn,
     getStockHistory,
     getLowStockBooks
   } = useInventory();
 
   const isAdmin = user?.role === 'admin';
-  const isCashier = user?.role === 'cashier';
+  // const isCashier = user?.role === 'cashier';
 
   const [activeTab, setActiveTab] = useState<'current' | 'alerts' | 'history'>('current');
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,9 +49,7 @@ const InventoryPage: React.FC = () => {
 
   // Form states
   const [bookForm, setBookForm] = useState({
-    title: '',
     author: '',
-    isbn: '',
     class: '',
     subject: '',
     type: 'textbook' as 'textbook' | 'workbook' | 'reference' | 'other',
@@ -85,7 +79,7 @@ const InventoryPage: React.FC = () => {
   ];
 
   const filteredBooks = books.filter(book => {
-    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = book.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          book.author.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = !selectedClass || book.class === selectedClass;
     return matchesSearch && matchesClass;
@@ -97,9 +91,7 @@ const InventoryPage: React.FC = () => {
     e.preventDefault();
     try {
       await addBook({
-        title: bookForm.title,
         author: bookForm.author,
-        isbn: bookForm.isbn,
         class: bookForm.class,
         subject: bookForm.subject,
         type: bookForm.type,
@@ -123,9 +115,7 @@ const InventoryPage: React.FC = () => {
     
     try {
       await updateBook(selectedBook.id, {
-        title: bookForm.title,
         author: bookForm.author,
-        isbn: bookForm.isbn,
         class: bookForm.class,
         subject: bookForm.subject,
         type: bookForm.type,
@@ -179,9 +169,7 @@ const InventoryPage: React.FC = () => {
 
   const resetBookForm = () => {
     setBookForm({
-      title: '',
       author: '',
-      isbn: '',
       class: '',
       subject: '',
       type: 'textbook',
@@ -212,9 +200,7 @@ const InventoryPage: React.FC = () => {
   const openEditModal = (book: Book) => {
     setSelectedBook(book);
     setBookForm({
-      title: book.title,
       author: book.author,
-      isbn: book.isbn,
       class: book.class,
       subject: book.subject,
       type: book.type,
@@ -315,13 +301,15 @@ const InventoryPage: React.FC = () => {
                   className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Classes</option>
-                  <option value="Class 6">Class 6</option>
-                  <option value="Class 7">Class 7</option>
-                  <option value="Class 8">Class 8</option>
-                  <option value="Class 9">Class 9</option>
-                  <option value="Class 10">Class 10</option>
-                  <option value="Class 11">Class 11</option>
-                  <option value="Class 12">Class 12</option>
+                  <option value="Basic 1">Basic 1</option>
+                  <option value="Basic 2">Basic 2</option>
+                  <option value="Basic 3">Basic 3</option>
+                  <option value="Basic 4">Basic 4</option>
+                  <option value="Basic 5">Basic 5</option>
+                  <option value="Basic 6">Basic 6</option>
+                  <option value="Basic 7">Basic 7</option>
+                  <option value="Basic 8">Basic 8</option>
+                  <option value="Basic 9">Basic 9</option>
                 </select>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
@@ -334,9 +322,9 @@ const InventoryPage: React.FC = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Book Details
-                      </th>
+                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                         Book Details
+                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Class/Subject
                       </th>
@@ -356,9 +344,8 @@ const InventoryPage: React.FC = () => {
                       <tr key={book.id} className={`hover:bg-gray-50 ${book.stock <= book.minStock ? 'bg-red-50' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{book.title}</div>
+                            <div className="text-sm font-medium text-gray-900">{book.subject}</div>
                             <div className="text-sm text-gray-500">by {book.author}</div>
-                            <div className="text-xs text-gray-400">ISBN: {book.isbn}</div>
                             <div className="text-xs text-gray-400 capitalize">{book.type}</div>
                           </div>
                         </td>
@@ -457,7 +444,7 @@ const InventoryPage: React.FC = () => {
                     <Card key={book.id}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-medium text-gray-900">{book.title}</h4>
+                           <h4 className="font-medium text-gray-900">{book.subject}</h4>
                           <p className="text-gray-600">{book.class} - {book.subject}</p>
                           <p className="text-sm text-red-600">
                             Current: {book.stock} | Minimum: {book.minStock}
@@ -512,26 +499,12 @@ const InventoryPage: React.FC = () => {
         size="lg"
       >
         <form onSubmit={handleAddBook} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input 
-              label="Book Title" 
-              placeholder="Enter book title"
-              value={bookForm.title}
-              onChange={(e) => setBookForm({...bookForm, title: e.target.value})}
-              required
-            />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input 
               label="Author" 
               placeholder="Enter author name"
               value={bookForm.author}
               onChange={(e) => setBookForm({...bookForm, author: e.target.value})}
-              required
-            />
-            <Input 
-              label="ISBN" 
-              placeholder="Enter ISBN"
-              value={bookForm.isbn}
-              onChange={(e) => setBookForm({...bookForm, isbn: e.target.value})}
               required
             />
             <select 
@@ -541,13 +514,15 @@ const InventoryPage: React.FC = () => {
               required
             >
               <option value="">Select Class</option>
-              <option value="Class 6">Class 6</option>
-              <option value="Class 7">Class 7</option>
-              <option value="Class 8">Class 8</option>
-              <option value="Class 9">Class 9</option>
-              <option value="Class 10">Class 10</option>
-              <option value="Class 11">Class 11</option>
-              <option value="Class 12">Class 12</option>
+              <option value="Basic 1">Basic 1</option>
+              <option value="Basic 2">Basic 2</option>
+              <option value="Basic 3">Basic 3</option>
+              <option value="Basic 4">Basic 4</option>
+              <option value="Basic 5">Basic 5</option>
+              <option value="Basic 6">Basic 6</option>
+              <option value="Basic 7">Basic 7</option>
+              <option value="Basic 8">Basic 8</option>
+              <option value="Basic 9">Basic 9</option>
             </select>
             <Input 
               label="Subject" 
@@ -640,26 +615,12 @@ const InventoryPage: React.FC = () => {
         size="lg"
       >
         <form onSubmit={handleUpdateBook} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input 
-              label="Book Title" 
-              placeholder="Enter book title"
-              value={bookForm.title}
-              onChange={(e) => setBookForm({...bookForm, title: e.target.value})}
-              required
-            />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input 
               label="Author" 
               placeholder="Enter author name"
               value={bookForm.author}
               onChange={(e) => setBookForm({...bookForm, author: e.target.value})}
-              required
-            />
-            <Input 
-              label="ISBN" 
-              placeholder="Enter ISBN"
-              value={bookForm.isbn}
-              onChange={(e) => setBookForm({...bookForm, isbn: e.target.value})}
               required
             />
             <select 
@@ -669,13 +630,15 @@ const InventoryPage: React.FC = () => {
               required
             >
               <option value="">Select Class</option>
-              <option value="Class 6">Class 6</option>
-              <option value="Class 7">Class 7</option>
-              <option value="Class 8">Class 8</option>
-              <option value="Class 9">Class 9</option>
-              <option value="Class 10">Class 10</option>
-              <option value="Class 11">Class 11</option>
-              <option value="Class 12">Class 12</option>
+              <option value="Basic 1">Basic 1</option>
+              <option value="Basic 2">Basic 2</option>
+              <option value="Basic 3">Basic 3</option>
+              <option value="Basic 4">Basic 4</option>
+              <option value="Basic 5">Basic 5</option>
+              <option value="Basic 6">Basic 6</option>
+              <option value="Basic 7">Basic 7</option>
+              <option value="Basic 8">Basic 8</option>
+              <option value="Basic 9">Basic 9</option>
             </select>
             <Input 
               label="Subject" 
@@ -763,7 +726,7 @@ const InventoryPage: React.FC = () => {
         {selectedBook && (
           <form onSubmit={handleAddStock} className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900">{selectedBook.title}</h4>
+              <h4 className="font-medium text-gray-900">{selectedBook.subject}</h4>
               <p className="text-gray-600">Current Stock: {selectedBook.stock} units</p>
             </div>
             <Input 
@@ -818,7 +781,7 @@ const InventoryPage: React.FC = () => {
         {selectedBook && (
           <form onSubmit={handleMarkWastage} className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900">{selectedBook.title}</h4>
+              <h4 className="font-medium text-gray-900">{selectedBook.subject}</h4>
               <p className="text-gray-600">Current Stock: {selectedBook.stock} units</p>
             </div>
             <Input 
@@ -860,13 +823,13 @@ const InventoryPage: React.FC = () => {
           setShowHistoryModal(false);
           setSelectedHistoryBook(null);
         }}
-        title={`Stock History - ${selectedHistoryBook?.title || ''}`}
+        title={`Stock History - ${selectedHistoryBook?.subject || ''}`}
         size="lg"
       >
         {selectedHistoryBook && (
           <div className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900">{selectedHistoryBook.title}</h4>
+              <h4 className="font-medium text-gray-900">{selectedHistoryBook.subject}</h4>
               <p className="text-gray-600">Current Stock: {selectedHistoryBook.stock} units</p>
             </div>
             

@@ -92,8 +92,8 @@ const mockSupplyOrders: SupplyOrder[] = [
     supplierId: '1',
     supplierName: 'NCERT Publications',
     items: [
-      { bookId: '1', bookTitle: 'Mathematics Class 10', quantity: 50, costPrice: 200, total: 10000 },
-      { bookId: '2', bookTitle: 'Science Class 10', quantity: 50, costPrice: 180, total: 9000 }
+      { bookId: '1', bookTitle: 'Mathematics Basic 9', quantity: 50, costPrice: 200, total: 10000 },
+      { bookId: '2', bookTitle: 'Science Basic 9', quantity: 50, costPrice: 180, total: 9000 }
     ],
     totalAmount: 19000,
     invoiceNumber: 'INV-2024-001',

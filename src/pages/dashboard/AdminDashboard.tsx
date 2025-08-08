@@ -5,12 +5,8 @@ import {
   CreditCard,
   TrendingUp,
   Package,
-  Users,
   ShoppingCart,
   Activity,
-  Calendar,
-  Clock,
-  Eye,
   ArrowUpRight,
   ArrowDownRight,
   CheckCircle
@@ -40,11 +36,11 @@ const AdminDashboard: React.FC = () => {
 
   // Mock top-selling books data
   const topSellingBooks = [
-    { title: 'Mathematics - Class 10', sales: 45, revenue: 6750, growth: 15 },
-    { title: 'English Grammar - Class 9', sales: 38, revenue: 4560, growth: 8 },
-    { title: 'Science - Class 8', sales: 32, revenue: 4800, growth: 12 },
-    { title: 'History - Class 7', sales: 28, revenue: 3360, growth: -3 },
-    { title: 'Geography - Class 6', sales: 25, revenue: 3000, growth: 5 }
+    { title: 'Mathematics - Basic 9', sales: 45, revenue: 6750, growth: 15 },
+    { title: 'English Grammar - Basic 8', sales: 38, revenue: 4560, growth: 8 },
+    { title: 'Science - Basic 7', sales: 32, revenue: 4800, growth: 12 },
+    { title: 'History - Basic 6', sales: 28, revenue: 3360, growth: -3 },
+    { title: 'Geography - Basic 5', sales: 25, revenue: 3000, growth: 5 }
   ];
 
   // Mock cashier activity logs
@@ -52,7 +48,7 @@ const AdminDashboard: React.FC = () => {
     { cashier: 'Sarah Johnson', action: 'Completed purchase for Rahul Kumar', amount: '₵850', time: '2 hours ago', status: 'completed' },
     { cashier: 'Mike Chen', action: 'Processed refund for Priya Sharma', amount: '-₵200', time: '3 hours ago', status: 'refund' },
     { cashier: 'Sarah Johnson', action: 'New student registration', amount: '₵1,200', time: '4 hours ago', status: 'completed' },
-    { cashier: 'Mike Chen', action: 'Bulk purchase for Class 10-A', amount: '₵2,450', time: '5 hours ago', status: 'completed' },
+    { cashier: 'Mike Chen', action: 'Bulk purchase for Basic 9-A', amount: '₵2,450', time: '5 hours ago', status: 'completed' },
     { cashier: 'Sarah Johnson', action: 'Partial payment received', amount: '₵500', time: '6 hours ago', status: 'partial' }
   ];
 
@@ -307,7 +303,7 @@ const AdminDashboard: React.FC = () => {
               lowStockBooks.slice(0, 5).map((book, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
                   <div>
-                    <p className="font-medium text-gray-900">{book.title}</p>
+                    <p className="font-medium text-gray-900">{book.subject || ''}</p>
                     <p className="text-sm text-orange-600">
                       Only {book.stock} left (Min: {book.minStock})
                     </p>

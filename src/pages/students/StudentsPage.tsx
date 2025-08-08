@@ -5,14 +5,11 @@ import {
   Filter, 
   Upload, 
   Download, 
-  GraduationCap,
   Edit,
   Trash2,
   FileSpreadsheet,
-  Users,
   Loader2
 } from 'lucide-react';
-import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
@@ -22,6 +19,7 @@ import { useStudentContext } from '../../contexts/StudentContext';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { BASIC_CLASSES, normalizeClassName } from '../../utils/classNames';
 
 const PAGE_SIZE = 10;
 
@@ -34,10 +32,7 @@ const StudentsPage: React.FC = () => {
     addStudent,
     editStudent,
     deleteStudent,
-    importStudentsFromExcel,
-    getStudentsByClass,
     searchStudents,
-    getStudentById,
     getPurchaseHistory
   } = useStudentContext();
 
@@ -62,7 +57,7 @@ const StudentsPage: React.FC = () => {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const classes = ['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'];
+  const classes = BASIC_CLASSES;
 
   // Filtering and searching
   const filteredStudents = (searchTerm ? searchStudents(searchTerm) : students)
@@ -377,8 +372,8 @@ const StudentsPage: React.FC = () => {
               const student = {
                 id: `${sheetName}-${i}-${studentId}`,
                 name: studentName,
-                class: sheetName, // Use sheet name as class
-                studentId: studentId, // Store the actual student ID from Excel
+                class: normalizeClassName(sheetName),
+                studentId: studentId,
                 createdAt: new Date().toISOString()
               };
               
@@ -401,8 +396,8 @@ const StudentsPage: React.FC = () => {
             const student = {
               id: `${sheetName}-${i}-${studentId}`,
               name: studentName,
-              class: sheetName, // Use sheet name as class
-              studentId: studentId, // Store the actual student ID from Excel
+              class: normalizeClassName(sheetName),
+              studentId: studentId,
               createdAt: new Date().toISOString()
             };
             
@@ -436,7 +431,7 @@ const StudentsPage: React.FC = () => {
     try {
       // Simulate import for each student in preview
       for (const student of importPreview) {
-        await addStudent({ name: student.name, class: student.class, studentId: student.studentId });
+        await addStudent({ name: student.name, class: normalizeClassName(student.class), studentId: student.studentId });
       }
       toast.success('Students imported successfully');
       setShowImportModal(false);
@@ -736,7 +731,7 @@ const StudentsPage: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="font-medium text-blue-900 mb-2">Excel Format Instructions:</h4>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Each sheet name represents the class (e.g., "Class 1", "Class 10")</li>
+              <li>• Each sheet name represents the class (e.g., "Basic 1", "Basic 9")</li>
               <li>• Each row should contain: Name, Student ID</li>
               <li>• First row should be headers: "Name", "Student ID"</li>
               <li>• All students in a sheet will be assigned to that class</li>

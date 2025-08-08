@@ -48,7 +48,7 @@ const mockUsers: User[] = [
 
 const mockActivityLogs = [
   { id: '1', userId: '2', userName: 'Sarah Cashier', action: 'Completed purchase for Rahul Kumar', timestamp: '2024-01-15T10:30:00', amount: '₵850' },
-  { id: '2', userId: '3', userName: 'Mike Johnson', action: 'Added stock for Mathematics Class 10', timestamp: '2024-01-15T09:15:00', amount: '50 units' },
+  { id: '2', userId: '3', userName: 'Mike Johnson', action: 'Added stock for Mathematics Basic 9', timestamp: '2024-01-15T09:15:00', amount: '50 units' },
   { id: '3', userId: '2', userName: 'Sarah Cashier', action: 'Generated receipt #12345', timestamp: '2024-01-15T08:45:00', amount: '₵650' },
   { id: '4', userId: '3', userName: 'Mike Johnson', action: 'Updated book price for English Grammar', timestamp: '2024-01-14T17:30:00', amount: '₵120' },
 ];

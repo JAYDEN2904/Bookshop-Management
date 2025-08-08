@@ -10,18 +10,13 @@ import {
   Phone,
   Mail,
   MapPin,
-  TrendingUp,
   AlertCircle,
-  Calendar,
   FileText,
   BarChart3,
   Clock,
-  CheckCircle,
   XCircle,
   Eye,
-  Filter,
-  Download,
-  RefreshCw
+  Download
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -29,7 +24,7 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import { useSupplier } from '../../contexts/SupplierContext';
 import { useInventory } from '../../contexts/InventoryContext';
-import { Supplier, SupplyOrder, SupplyItem, SupplierPayment } from '../../types';
+import { Supplier, SupplyItem } from '../../types';
 import toast from 'react-hot-toast';
 
 const SuppliersPage: React.FC = () => {
@@ -45,7 +40,6 @@ const SuppliersPage: React.FC = () => {
     getSupplierLedger,
     getSupplierAnalytics,
     getOverduePayments,
-    getUpcomingPayments,
     updateSupplyOrderStatus
   } = useSupplier();
   
@@ -103,7 +97,6 @@ const SuppliersPage: React.FC = () => {
   const totalBalance = suppliers.reduce((sum, supplier) => sum + supplier.balance, 0);
   const outstandingPayments = suppliers.filter(s => s.balance < 0).reduce((sum, s) => sum + Math.abs(s.balance), 0);
   const overduePayments = getOverduePayments();
-  const upcomingPayments = getUpcomingPayments();
 
   const handleAddSupplier = () => {
     if (!supplierForm.name || !supplierForm.contact || !supplierForm.email) {
@@ -223,7 +216,7 @@ const SuppliersPage: React.FC = () => {
         // Update bookTitle when bookId changes
         if (field === 'bookId') {
           const selectedBook = books.find(book => book.id === value);
-          updatedItem.bookTitle = selectedBook?.title || '';
+          updatedItem.bookTitle = selectedBook?.subject || '';
         }
         
         // Update total when quantity or costPrice changes
@@ -888,7 +881,7 @@ const SuppliersPage: React.FC = () => {
                     >
                       <option value="">Select Book</option>
                       {books.map(book => (
-                        <option key={book.id} value={book.id}>{book.title}</option>
+                        <option key={book.id} value={book.id}>{book.subject}</option>
                       ))}
                 </select>
                   </div>

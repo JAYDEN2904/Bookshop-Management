@@ -27,8 +27,8 @@ const mockReceipts: Purchase[] = [
     studentId: '1',
     studentName: 'Rahul Kumar',
     items: [
-      { bookId: '1', title: 'Mathematics Class 10', quantity: 1, price: 150, total: 150 },
-      { bookId: '2', title: 'Science Class 10', quantity: 1, price: 140, total: 140 }
+      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 },
+      { bookId: '2', title: 'Science Basic 9', quantity: 1, price: 140, total: 140 }
     ],
     total: 290,
     discount: 0,
@@ -43,7 +43,7 @@ const mockReceipts: Purchase[] = [
     studentName: 'Priya Sharma',
     items: [
       { bookId: '3', title: 'English Grammar', quantity: 1, price: 120, total: 120 },
-      { bookId: '4', title: 'History Class 9', quantity: 1, price: 110, total: 110 }
+      { bookId: '4', title: 'History Basic 8', quantity: 1, price: 110, total: 110 }
     ],
     total: 230,
     discount: 10,
@@ -57,7 +57,7 @@ const mockReceipts: Purchase[] = [
     studentId: '3',
     studentName: 'Amit Singh',
     items: [
-      { bookId: '5', title: 'Geography Class 8', quantity: 2, price: 95, total: 190 }
+      { bookId: '5', title: 'Geography Basic 7', quantity: 2, price: 95, total: 190 }
     ],
     total: 190,
     discount: 5,
@@ -71,8 +71,8 @@ const mockReceipts: Purchase[] = [
     studentId: '4',
     studentName: 'Sneha Patel',
     items: [
-      { bookId: '1', title: 'Mathematics Class 10', quantity: 1, price: 150, total: 150 },
-      { bookId: '6', title: 'Physics Class 11', quantity: 1, price: 180, total: 180 }
+      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 },
+      { bookId: '6', title: 'Physics Basic 6', quantity: 1, price: 180, total: 180 }
     ],
     total: 330,
     discount: 0,
@@ -86,7 +86,7 @@ const mockReceipts: Purchase[] = [
     studentId: '5',
     studentName: 'Kavya Reddy',
     items: [
-      { bookId: '7', title: 'Chemistry Class 12', quantity: 1, price: 200, total: 200 }
+      { bookId: '7', title: 'Chemistry Basic 5', quantity: 1, price: 200, total: 200 }
     ],
     total: 200,
     discount: 15,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Student, Purchase } from '../types';
 import { useAuth } from './AuthContext';
+import { normalizeClassName } from '../utils/classNames';
 
 interface StudentContextType {
   students: Student[];
@@ -28,12 +29,12 @@ export const useStudentContext = () => {
 
 // Mock data for demonstration
 const mockStudents: Student[] = [
-  { id: '1', name: 'Rahul Kumar', class: 'Class 10', studentId: '10A01', createdAt: '2024-01-01' },
-  { id: '2', name: 'Priya Sharma', class: 'Class 10', studentId: '10A02', createdAt: '2024-01-02' },
-  { id: '3', name: 'Amit Singh', class: 'Class 9', studentId: '9B15', createdAt: '2024-01-03' },
-  { id: '4', name: 'Sneha Patel', class: 'Class 9', studentId: '9B16', createdAt: '2024-01-04' },
-  { id: '5', name: 'Ravi Gupta', class: 'Class 8', studentId: '8C22', createdAt: '2024-01-05' },
-  { id: '6', name: 'Anita Verma', class: 'Class 8', studentId: '8C23', createdAt: '2024-01-06' },
+  { id: '1', name: 'Rahul Kumar', class: 'Basic 9', studentId: '10A01', createdAt: '2024-01-01' },
+  { id: '2', name: 'Priya Sharma', class: 'Basic 9', studentId: '10A02', createdAt: '2024-01-02' },
+      { id: '3', name: 'Amit Singh', class: 'Basic 8', studentId: '9B15', createdAt: '2024-01-03' },
+    { id: '4', name: 'Sneha Patel', class: 'Basic 8', studentId: '9B16', createdAt: '2024-01-04' },
+      { id: '5', name: 'Ravi Gupta', class: 'Basic 7', studentId: '8C22', createdAt: '2024-01-05' },
+    { id: '6', name: 'Anita Verma', class: 'Basic 7', studentId: '8C23', createdAt: '2024-01-06' },
 ];
 
 const mockPurchases: Purchase[] = [
@@ -42,7 +43,7 @@ const mockPurchases: Purchase[] = [
     studentId: '1',
     studentName: 'Rahul Kumar',
     items: [
-      { bookId: '1', title: 'Mathematics Class 10', quantity: 1, price: 150, total: 150 }
+      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 }
     ],
     total: 150,
     discount: 0,
@@ -79,24 +80,22 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const savedStudents = localStorage.getItem('students');
       if (savedStudents) {
         const parsedStudents = JSON.parse(savedStudents);
-        // Migrate old students that might not have studentId
         const migratedStudents = parsedStudents.map((student: any) => {
-          if (!student.studentId) {
-            // Generate a studentId from the existing data
-            return {
-              ...student,
-              studentId: student.rollNumber || `ID-${student.id}`
-            };
+          const normalizedClass = normalizeClassName(student.class);
+          const normalized = { ...student, class: normalizedClass };
+          if (!normalized.studentId) {
+            normalized.studentId = student.rollNumber || `ID-${student.id}`;
           }
-          return student;
+          return normalized;
         });
         setStudents(migratedStudents);
       } else {
-        setStudents(mockStudents);
+        // Normalize mock data too
+        setStudents(mockStudents.map(s => ({ ...s, class: normalizeClassName(s.class) })));
       }
     } catch (err) {
       console.error('Error loading students from localStorage:', err);
-      setStudents(mockStudents);
+      setStudents(mockStudents.map(s => ({ ...s, class: normalizeClassName(s.class) })));
     }
     setIsLoading(false);
   }, []);
@@ -112,6 +111,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const newStudent: Student = {
         ...studentData,
+        class: normalizeClassName(studentData.class),
         id: Date.now().toString(),
         createdAt: new Date().toISOString()
       };
@@ -124,7 +124,11 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const editStudent = async (id: string, updates: Partial<Student>) => {
     try {
-      setStudents(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      setStudents(prev => prev.map(s => {
+        if (s.id !== id) return s;
+        const nextClass = updates.class !== undefined ? normalizeClassName(updates.class) : s.class;
+        return { ...s, ...updates, class: nextClass } as Student;
+      }));
     } catch (err) {
       setError('Failed to edit student');
       throw err;
@@ -141,19 +145,16 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Simulate Excel import (admin only)
-  const importStudentsFromExcel = async (file: File) => {
+  const importStudentsFromExcel = async (_file: File) => {
     if (user?.role !== 'admin') {
       setError('Permission denied');
       throw new Error('Permission denied');
     }
-    // In a real app, parse the Excel file here
-    // For now, just simulate a delay
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        // Simulate import by adding a mock student
         setStudents(prev => ([
           ...prev,
-          { id: Date.now().toString(), name: 'Imported Student', class: 'Class 7', studentId: '7A99', createdAt: new Date().toISOString() }
+          { id: Date.now().toString(), name: 'Imported Student', class: normalizeClassName('Basic 6'), studentId: '7A99', createdAt: new Date().toISOString() }
         ]));
         resolve();
       }, 1000);
@@ -161,7 +162,8 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getStudentsByClass = (className: string) => {
-    return students.filter(s => s.class === className);
+    const normalized = normalizeClassName(className);
+    return students.filter(s => normalizeClassName(s.class) === normalized);
   };
 
   const searchStudents = (query: string) => {

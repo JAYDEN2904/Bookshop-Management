@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  DollarSign, 
   AlertTriangle,
   ShoppingCart,
   Clock,
@@ -8,8 +7,7 @@ import {
   Users,
   BookOpen,
   CheckCircle,
-  ArrowUpRight,
-  ArrowDownRight
+  ArrowUpRight
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import { useInventory } from '../../contexts/InventoryContext';
@@ -32,19 +30,19 @@ const CashierDashboard: React.FC = () => {
 
   // Mock recent transactions
   const recentTransactions = [
-    { student: 'Rahul Kumar', class: 'Class 10-A', amount: 850, time: '10:30 AM', items: 5 },
-    { student: 'Priya Sharma', class: 'Class 9-B', amount: 650, time: '10:15 AM', items: 4 },
-    { student: 'Amit Singh', class: 'Class 8-C', amount: 1200, time: '09:45 AM', items: 8 },
-    { student: 'Sneha Patel', class: 'Class 11-A', amount: 950, time: '09:30 AM', items: 6 },
-    { student: 'Kavya Reddy', class: 'Class 12-B', amount: 750, time: '09:20 AM', items: 3 }
+    { student: 'Rahul Kumar', class: 'Basic 9-A', amount: 850, time: '10:30 AM', items: 5 },
+    { student: 'Priya Sharma', class: 'Basic 8-B', amount: 650, time: '10:15 AM', items: 4 },
+    { student: 'Amit Singh', class: 'Basic 7-C', amount: 1200, time: '09:45 AM', items: 8 },
+    { student: 'Sneha Patel', class: 'Basic 6-A', amount: 950, time: '09:30 AM', items: 6 },
+    { student: 'Kavya Reddy', class: 'Basic 5-B', amount: 750, time: '09:20 AM', items: 3 }
   ];
 
   // Mock top selling items today
   const topSellingItems = [
-    { title: 'Mathematics - Class 10', sold: 12, revenue: 1800 },
-    { title: 'English Grammar - Class 9', sold: 8, revenue: 960 },
-    { title: 'Science - Class 8', sold: 6, revenue: 720 },
-    { title: 'History - Class 7', sold: 4, revenue: 480 }
+    { title: 'Mathematics - Basic 9', sold: 12, revenue: 1800 },
+    { title: 'English Grammar - Basic 8', sold: 8, revenue: 960 },
+    { title: 'Science - Basic 7', sold: 6, revenue: 720 },
+    { title: 'History - Basic 6', sold: 4, revenue: 480 }
   ];
 
   return (
@@ -143,7 +141,7 @@ const CashierDashboard: React.FC = () => {
               lowStockBooks.slice(0, 5).map((book, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
                   <div>
-                    <p className="font-medium text-gray-900">{book.title}</p>
+                    <p className="font-medium text-gray-900">{book.subject}</p>
                     <p className="text-sm text-red-600">Only {book.stock} left (Min: {book.minStock})</p>
                   </div>
                   <div className="text-right">

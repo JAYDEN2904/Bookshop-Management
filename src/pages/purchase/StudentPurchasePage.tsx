@@ -5,54 +5,167 @@ import Input from '../../components/ui/Input';
 import Card from '../../components/ui/Card';
 import { User, Package, Trash2, Plus, ShoppingCart, Download, History } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useStudentContext } from '../../contexts/StudentContext';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Mock user role (replace with real auth context later)
-// For demo, you can switch between 'admin' and 'cashier' here:
-const mockUser = { role: 'cashier', name: 'Sarah Cashier' };
-
-// Mock data for classes and students
-const mockClasses = [
-  'Class 7',
-  'Class 8',
-  'Class 9',
-  'Class 10',
-  'Class 11',
-  'Class 12',
-];
-
-const mockStudents = [
-  { id: '1', name: 'Ama Mensah', class: 'Class 10', studentId: '10A01' },
-  { id: '2', name: 'Kwame Boateng', class: 'Class 9', studentId: '9B15' },
-  { id: '3', name: 'Akosua Owusu', class: 'Class 8', studentId: '8C22' },
-  { id: '4', name: 'Yaw Ofori', class: 'Class 10', studentId: '10A02' },
-  { id: '5', name: 'Efua Asante', class: 'Class 9', studentId: '9B16' },
-];
+// Mock data for classes
+const classes = ['Basic 1', 'Basic 2', 'Basic 3', 'Basic 4', 'Basic 5', 'Basic 6', 'Basic 7', 'Basic 8', 'Basic 9'];
 
 // Mock data for books (with stock and price)
 const mockBooks = [
-  { id: 'b1', title: 'Mathematics', class: 'Class 10', stock: 10, price: 50 },
-  { id: 'b2', title: 'English Grammar', class: 'Class 10', stock: 5, price: 40 },
-  { id: 'b3', title: 'Science', class: 'Class 10', stock: 0, price: 60 },
-  { id: 'b4', title: 'Mathematics', class: 'Class 9', stock: 8, price: 45 },
-  { id: 'b5', title: 'English Grammar', class: 'Class 9', stock: 12, price: 38 },
-  { id: 'b6', title: 'Science', class: 'Class 9', stock: 3, price: 55 },
+  // Basic 9 Books
+  { id: 'b1', title: 'Mathematics', class: 'Basic 9', stock: 10, price: 50 },
+  { id: 'b2', title: 'English Grammar', class: 'Basic 9', stock: 5, price: 40 },
+  { id: 'b3', title: 'Science', class: 'Basic 9', stock: 0, price: 60 },
+  { id: 'b4', title: 'Social Studies', class: 'Basic 9', stock: 8, price: 45 },
+  { id: 'b5', title: 'French', class: 'Basic 9', stock: 12, price: 35 },
+  { id: 'b6', title: 'ICT', class: 'Basic 9', stock: 15, price: 55 },
+  
+  // Basic 8 Books
+  { id: 'b7', title: 'Mathematics', class: 'Basic 8', stock: 8, price: 45 },
+  { id: 'b8', title: 'English Grammar', class: 'Basic 8', stock: 12, price: 38 },
+  { id: 'b9', title: 'Science', class: 'Basic 8', stock: 3, price: 55 },
+  { id: 'b10', title: 'Social Studies', class: 'Basic 8', stock: 10, price: 42 },
+  { id: 'b11', title: 'French', class: 'Basic 8', stock: 7, price: 32 },
+  { id: 'b12', title: 'ICT', class: 'Basic 8', stock: 13, price: 50 },
+  
+  // Basic 7 Books
+  { id: 'b13', title: 'Mathematics', class: 'Basic 7', stock: 15, price: 42 },
+  { id: 'b14', title: 'English Grammar', class: 'Basic 7', stock: 9, price: 35 },
+  { id: 'b15', title: 'Science', class: 'Basic 7', stock: 11, price: 48 },
+  { id: 'b16', title: 'Social Studies', class: 'Basic 7', stock: 6, price: 38 },
+  { id: 'b17', title: 'French', class: 'Basic 7', stock: 14, price: 30 },
+  { id: 'b18', title: 'ICT', class: 'Basic 7', stock: 8, price: 45 },
+  
+  // Basic 6 Books
+  { id: 'b19', title: 'Mathematics', class: 'Basic 6', stock: 12, price: 40 },
+  { id: 'b20', title: 'English Grammar', class: 'Basic 6', stock: 16, price: 32 },
+  { id: 'b21', title: 'Science', class: 'Basic 6', stock: 7, price: 45 },
+  { id: 'b22', title: 'Social Studies', class: 'Basic 6', stock: 9, price: 35 },
+  { id: 'b23', title: 'French', class: 'Basic 6', stock: 11, price: 28 },
+  { id: 'b24', title: 'ICT', class: 'Basic 6', stock: 10, price: 40 },
+  
+  // Basic 5 Books
+  { id: 'b25', title: 'Mathematics', class: 'Basic 5', stock: 18, price: 38 },
+  { id: 'b26', title: 'English Grammar', class: 'Basic 5', stock: 14, price: 30 },
+  { id: 'b27', title: 'Science', class: 'Basic 5', stock: 13, price: 42 },
+  { id: 'b28', title: 'Social Studies', class: 'Basic 5', stock: 8, price: 32 },
+  { id: 'b29', title: 'French', class: 'Basic 5', stock: 12, price: 25 },
+  { id: 'b30', title: 'ICT', class: 'Basic 5', stock: 9, price: 38 },
+  
+  // Basic 4 Books
+  { id: 'b31', title: 'Mathematics', class: 'Basic 4', stock: 20, price: 35 },
+  { id: 'b32', title: 'English Grammar', class: 'Basic 4', stock: 17, price: 28 },
+  { id: 'b33', title: 'Science', class: 'Basic 4', stock: 15, price: 40 },
+  { id: 'b34', title: 'Social Studies', class: 'Basic 4', stock: 11, price: 30 },
+  { id: 'b35', title: 'French', class: 'Basic 4', stock: 13, price: 22 },
+  { id: 'b36', title: 'ICT', class: 'Basic 4', stock: 12, price: 35 },
+  
+  // Basic 3 Books
+  { id: 'b37', title: 'Mathematics', class: 'Basic 3', stock: 22, price: 32 },
+  { id: 'b38', title: 'English Grammar', class: 'Basic 3', stock: 19, price: 25 },
+  { id: 'b39', title: 'Science', class: 'Basic 3', stock: 16, price: 38 },
+  { id: 'b40', title: 'Social Studies', class: 'Basic 3', stock: 14, price: 28 },
+  { id: 'b41', title: 'French', class: 'Basic 3', stock: 15, price: 20 },
+  { id: 'b42', title: 'ICT', class: 'Basic 3', stock: 13, price: 32 },
+  
+  // Basic 2 Books
+  { id: 'b43', title: 'Mathematics', class: 'Basic 2', stock: 25, price: 30 },
+  { id: 'b44', title: 'English Grammar', class: 'Basic 2', stock: 21, price: 22 },
+  { id: 'b45', title: 'Science', class: 'Basic 2', stock: 18, price: 35 },
+  { id: 'b46', title: 'Social Studies', class: 'Basic 2', stock: 16, price: 25 },
+  { id: 'b47', title: 'French', class: 'Basic 2', stock: 17, price: 18 },
+  { id: 'b48', title: 'ICT', class: 'Basic 2', stock: 14, price: 30 },
+  
+  // Basic 1 Books
+  { id: 'b49', title: 'Mathematics', class: 'Basic 1', stock: 28, price: 28 },
+  { id: 'b50', title: 'English Grammar', class: 'Basic 1', stock: 24, price: 20 },
+  { id: 'b51', title: 'Science', class: 'Basic 1', stock: 20, price: 32 },
+  { id: 'b52', title: 'Social Studies', class: 'Basic 1', stock: 18, price: 22 },
+  { id: 'b53', title: 'French', class: 'Basic 1', stock: 19, price: 15 },
+  { id: 'b54', title: 'ICT', class: 'Basic 1', stock: 16, price: 28 },
 ];
 
 // Mock bundles (class -> array of {bookId, quantity})
 const initialBundles = {
-  'Class 10': [
-    { bookId: 'b1', quantity: 1 },
-    { bookId: 'b2', quantity: 1 },
-    { bookId: 'b3', quantity: 1 },
+  'Basic 9': [
+    { bookId: 'b1', quantity: 1 }, // Mathematics
+    { bookId: 'b2', quantity: 1 }, // English Grammar
+    { bookId: 'b3', quantity: 1 }, // Science
+    { bookId: 'b4', quantity: 1 }, // Social Studies
+    { bookId: 'b5', quantity: 1 }, // French
+    { bookId: 'b6', quantity: 1 }, // ICT
   ],
-  'Class 9': [
-    { bookId: 'b4', quantity: 1 },
-    { bookId: 'b5', quantity: 1 },
-    { bookId: 'b6', quantity: 1 },
+  'Basic 8': [
+    { bookId: 'b7', quantity: 1 }, // Mathematics
+    { bookId: 'b8', quantity: 1 }, // English Grammar
+    { bookId: 'b9', quantity: 1 }, // Science
+    { bookId: 'b10', quantity: 1 }, // Social Studies
+    { bookId: 'b11', quantity: 1 }, // French
+    { bookId: 'b12', quantity: 1 }, // ICT
+  ],
+  'Basic 7': [
+    { bookId: 'b13', quantity: 1 }, // Mathematics
+    { bookId: 'b14', quantity: 1 }, // English Grammar
+    { bookId: 'b15', quantity: 1 }, // Science
+    { bookId: 'b16', quantity: 1 }, // Social Studies
+    { bookId: 'b17', quantity: 1 }, // French
+    { bookId: 'b18', quantity: 1 }, // ICT
+  ],
+  'Basic 6': [
+    { bookId: 'b19', quantity: 1 }, // Mathematics
+    { bookId: 'b20', quantity: 1 }, // English Grammar
+    { bookId: 'b21', quantity: 1 }, // Science
+    { bookId: 'b22', quantity: 1 }, // Social Studies
+    { bookId: 'b23', quantity: 1 }, // French
+    { bookId: 'b24', quantity: 1 }, // ICT
+  ],
+  'Basic 5': [
+    { bookId: 'b25', quantity: 1 }, // Mathematics
+    { bookId: 'b26', quantity: 1 }, // English Grammar
+    { bookId: 'b27', quantity: 1 }, // Science
+    { bookId: 'b28', quantity: 1 }, // Social Studies
+    { bookId: 'b29', quantity: 1 }, // French
+    { bookId: 'b30', quantity: 1 }, // ICT
+  ],
+  'Basic 4': [
+    { bookId: 'b31', quantity: 1 }, // Mathematics
+    { bookId: 'b32', quantity: 1 }, // English Grammar
+    { bookId: 'b33', quantity: 1 }, // Science
+    { bookId: 'b34', quantity: 1 }, // Social Studies
+    { bookId: 'b35', quantity: 1 }, // French
+    { bookId: 'b36', quantity: 1 }, // ICT
+  ],
+  'Basic 3': [
+    { bookId: 'b37', quantity: 1 }, // Mathematics
+    { bookId: 'b38', quantity: 1 }, // English Grammar
+    { bookId: 'b39', quantity: 1 }, // Science
+    { bookId: 'b40', quantity: 1 }, // Social Studies
+    { bookId: 'b41', quantity: 1 }, // French
+    { bookId: 'b42', quantity: 1 }, // ICT
+  ],
+  'Basic 2': [
+    { bookId: 'b43', quantity: 1 }, // Mathematics
+    { bookId: 'b44', quantity: 1 }, // English Grammar
+    { bookId: 'b45', quantity: 1 }, // Science
+    { bookId: 'b46', quantity: 1 }, // Social Studies
+    { bookId: 'b47', quantity: 1 }, // French
+    { bookId: 'b48', quantity: 1 }, // ICT
+  ],
+  'Basic 1': [
+    { bookId: 'b49', quantity: 1 }, // Mathematics
+    { bookId: 'b50', quantity: 1 }, // English Grammar
+    { bookId: 'b51', quantity: 1 }, // Science
+    { bookId: 'b52', quantity: 1 }, // Social Studies
+    { bookId: 'b53', quantity: 1 }, // French
+    { bookId: 'b54', quantity: 1 }, // ICT
   ],
 };
 
 const StudentPurchasePage: React.FC = () => {
+  const { user } = useAuth();
+  const { students } = useStudentContext();
+  
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +178,9 @@ const StudentPurchasePage: React.FC = () => {
   const [editingBundle, setEditingBundle] = useState<{ bookId: string; quantity: number }[]>([]);
   const [addBookId, setAddBookId] = useState('');
   const [addBookQty, setAddBookQty] = useState(1);
+
+  // Get unique classes from actual students
+  const availableClasses = Array.from(new Set(students.map(student => student.class))).sort();
 
   // Inventory/book selection modal
   const [showBookModal, setShowBookModal] = useState(false);
@@ -160,7 +276,7 @@ const StudentPurchasePage: React.FC = () => {
   };
 
   // Filter students by selected class and search term
-  const filteredStudents = mockStudents.filter(
+  const filteredStudents = students.filter(
     (student) =>
       (!selectedClass || student.class === selectedClass) &&
       (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -261,7 +377,7 @@ const StudentPurchasePage: React.FC = () => {
   const total = subtotal - discountAmount;
 
   // Discount permission logic
-  const isCashier = mockUser.role === 'cashier';
+  const isCashier = user?.role === 'cashier';
   const needsOverride = isCashier && discountType === 'percent' && discountValue > MAX_CASHIER_PERCENT && !overrideActive;
   const canApplyDiscount = !needsOverride;
 
@@ -694,12 +810,12 @@ const StudentPurchasePage: React.FC = () => {
       </Modal>
 
       {/* Admin-only: Bundle Management */}
-      {mockUser.role === 'admin' && (
+      {user?.role === 'admin' && (
           <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Class Bundles</h3>
             <div className="flex space-x-2">
-              {mockClasses.map((cls) => (
+              {availableClasses.map((cls) => (
                 <Button key={cls} size="sm" variant="outline" onClick={() => openBundleModal(cls)}>
                   <Package className="h-4 w-4 mr-1" /> Edit {cls} Bundle
                 </Button>
@@ -725,7 +841,7 @@ const StudentPurchasePage: React.FC = () => {
               onChange={(e) => setSelectedClass(e.target.value)}
             >
               <option value="">All Classes</option>
-              {mockClasses.map((cls) => (
+              {availableClasses.map((cls) => (
                 <option key={cls} value={cls}>
                   {cls}
                 </option>
@@ -741,7 +857,9 @@ const StudentPurchasePage: React.FC = () => {
           
           <div className="max-h-64 overflow-y-auto space-y-2">
             {filteredStudents.length === 0 && (
-              <div className="text-center text-gray-400 py-8">No students found.</div>
+              <div className="text-center text-gray-400 py-8">
+                {students.length === 0 ? 'No students imported yet. Please import students first.' : 'No students found matching your search criteria.'}
+              </div>
             )}
             {filteredStudents.map((student) => (
               <button
@@ -926,7 +1044,7 @@ const StudentPurchasePage: React.FC = () => {
               <option value="bank">Bank Transfer</option>
               <option value="other">Other</option>
             </select>
-            {mockUser.role === 'admin' && (
+            {user?.role === 'admin' && (
               <Button size="sm" variant="outline" onClick={handleExportCSV}>
                 <Download className="h-4 w-4 mr-1" /> Export CSV
               </Button>

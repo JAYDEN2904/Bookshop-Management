@@ -4,7 +4,6 @@ import {
   TrendingUp, 
   DollarSign, 
   Package, 
-  Calendar,
   Download,
   Filter,
   PieChart,
@@ -34,10 +33,10 @@ const ReportsPage: React.FC = () => {
   ];
 
   const topBooks = [
-    { title: 'Mathematics Class 10', sales: 245, revenue: 36750 },
-    { title: 'English Grammar', sales: 198, revenue: 23760 },
-    { title: 'Science Class 9', sales: 167, revenue: 21710 },
-    { title: 'History Class 8', sales: 134, revenue: 16080 },
+    { title: 'Mathematics Basic 9', sales: 245, revenue: 36750 },
+    { title: 'English Grammar Basic 8', sales: 189, revenue: 22680 },
+    { title: 'Science Basic 8', sales: 167, revenue: 21710 },
+    { title: 'History Basic 7', sales: 134, revenue: 16080 },
   ];
 
   return (
@@ -177,7 +176,7 @@ const ReportsPage: React.FC = () => {
                     {topBooks.map((book, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-medium text-gray-900">{book.title}</p>
+                  <p className="font-medium text-gray-900">{book.title}</p>
                           <p className="text-sm text-gray-600">{book.sales} copies sold</p>
                         </div>
                         <p className="font-semibold text-green-600">₵{book.revenue.toLocaleString('en-US')}</p>
@@ -252,9 +251,9 @@ const ReportsPage: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Turnover</h3>
                   <div className="space-y-4">
                     {[
-                      { category: 'Class 10 Books', turnover: '8.5x', status: 'High' },
-                      { category: 'Class 9 Books', turnover: '6.2x', status: 'Medium' },
-                      { category: 'Class 8 Books', turnover: '4.8x', status: 'Medium' },
+                      { category: 'Basic 9 Books', turnover: '8.5x', status: 'High' },
+                      { category: 'Basic 8 Books', turnover: '6.2x', status: 'Medium' },
+                      { category: 'Basic 7 Books', turnover: '4.8x', status: 'Medium' },
                       { category: 'Stationery', turnover: '12.3x', status: 'High' },
                     ].map((item, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -289,9 +288,9 @@ const ReportsPage: React.FC = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {[
-                        { book: 'Mathematics Class 10', opening: 50, purchased: 100, sold: 125, current: 25, value: 3750 },
-                        { book: 'English Grammar', opening: 30, purchased: 80, sold: 92, current: 18, value: 2160 },
-                        { book: 'Science Class 9', opening: 40, purchased: 60, sold: 78, current: 22, value: 2860 },
+                        { book: 'Mathematics Basic 9', opening: 50, purchased: 100, sold: 125, current: 25, value: 3750 },
+                        { book: 'English Grammar Basic 8', opening: 40, purchased: 60, sold: 78, current: 22, value: 2860 },
+                        { book: 'Science Basic 8', opening: 35, purchased: 50, sold: 65, current: 20, value: 2600 },
                       ].map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

@@ -9,9 +9,7 @@ export interface User {
 
 export interface Book {
   id: string;
-  title: string;
   author: string;
-  isbn: string;
   class: string;
   subject: string;
   type: 'textbook' | 'workbook' | 'reference' | 'other';
