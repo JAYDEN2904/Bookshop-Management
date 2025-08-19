@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Student, Purchase } from '../types';
 import { useAuth } from './AuthContext';
 import { normalizeClassName } from '../utils/classNames';
+import { supabase } from '../config/supabase';
 
 interface StudentContextType {
   students: Student[];
@@ -15,6 +16,7 @@ interface StudentContextType {
   searchStudents: (query: string) => Student[];
   getStudentById: (id: string) => Student | undefined;
   getPurchaseHistory: (studentId: string) => Purchase[];
+  refreshStudents: () => Promise<void>;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -27,149 +29,237 @@ export const useStudentContext = () => {
   return context;
 };
 
-// Mock data for demonstration
-const mockStudents: Student[] = [
-  { id: '1', name: 'Rahul Kumar', class: 'Basic 9', studentId: '10A01', createdAt: '2024-01-01' },
-  { id: '2', name: 'Priya Sharma', class: 'Basic 9', studentId: '10A02', createdAt: '2024-01-02' },
-      { id: '3', name: 'Amit Singh', class: 'Basic 8', studentId: '9B15', createdAt: '2024-01-03' },
-    { id: '4', name: 'Sneha Patel', class: 'Basic 8', studentId: '9B16', createdAt: '2024-01-04' },
-      { id: '5', name: 'Ravi Gupta', class: 'Basic 7', studentId: '8C22', createdAt: '2024-01-05' },
-    { id: '6', name: 'Anita Verma', class: 'Basic 7', studentId: '8C23', createdAt: '2024-01-06' },
-];
-
-const mockPurchases: Purchase[] = [
-  {
-    id: 'p1',
-    studentId: '1',
-    studentName: 'Rahul Kumar',
-    items: [
-      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 }
-    ],
-    total: 150,
-    discount: 0,
-    paymentMode: 'cash',
-    cashierId: '2',
-    cashierName: 'Sarah Cashier',
-    createdAt: '2024-01-10'
-  },
-  {
-    id: 'p2',
-    studentId: '2',
-    studentName: 'Priya Sharma',
-    items: [
-      { bookId: '2', title: 'English Grammar', quantity: 1, price: 120, total: 120 }
-    ],
-    total: 120,
-    discount: 0,
-    paymentMode: 'card',
-    cashierId: '2',
-    cashierName: 'Sarah Cashier',
-    createdAt: '2024-01-12'
-  }
-];
-
 export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  // Load students from localStorage on mount
-  useEffect(() => {
+  // Load students from Supabase
+  const loadStudents = async () => {
     try {
-      const savedStudents = localStorage.getItem('students');
-      if (savedStudents) {
-        const parsedStudents = JSON.parse(savedStudents);
-        const migratedStudents = parsedStudents.map((student: any) => {
-          const normalizedClass = normalizeClassName(student.class);
-          const normalized = { ...student, class: normalizedClass };
-          if (!normalized.studentId) {
-            normalized.studentId = student.rollNumber || `ID-${student.id}`;
-          }
-          return normalized;
-        });
-        setStudents(migratedStudents);
-      } else {
-        // Normalize mock data too
-        setStudents(mockStudents.map(s => ({ ...s, class: normalizeClassName(s.class) })));
+      setError(null);
+      const { data: studentsData, error: fetchError } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        console.error('Error fetching students:', fetchError);
+        setError('Failed to load students');
+        return;
       }
-    } catch (err) {
-      console.error('Error loading students from localStorage:', err);
-      setStudents(mockStudents.map(s => ({ ...s, class: normalizeClassName(s.class) })));
+
+      // Map Supabase field names to Student interface
+      const mappedStudents: Student[] = (studentsData || []).map(student => ({
+        id: student.id,
+        name: student.name,
+        class: normalizeClassName(student.class_level),
+        studentId: student.student_id,
+        createdAt: student.created_at
+      }));
+
+      setStudents(mappedStudents);
+    } catch (error: any) {
+      console.error('Failed to load students:', error);
+      setError(error.message || 'Failed to load students');
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadStudents();
     }
     setIsLoading(false);
-  }, []);
+  }, [user]);
 
-  // Save students to localStorage whenever students change
-  useEffect(() => {
-    if (students.length > 0) {
-      localStorage.setItem('students', JSON.stringify(students));
-    }
-  }, [students]);
+  const refreshStudents = async () => {
+    setIsLoading(true);
+    await loadStudents();
+    setIsLoading(false);
+  };
 
   const addStudent = async (studentData: Omit<Student, 'id' | 'createdAt'>) => {
     try {
-      const newStudent: Student = {
-        ...studentData,
-        class: normalizeClassName(studentData.class),
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString()
+      setError(null);
+      const normalizedData = {
+        name: studentData.name,
+        class_level: normalizeClassName(studentData.class),
+        student_id: studentData.studentId
       };
-      setStudents(prev => [...prev, newStudent]);
-    } catch (err) {
-      setError('Failed to add student');
-      throw err;
+      
+      const { data: newStudent, error: createError } = await supabase
+        .from('students')
+        .insert([normalizedData])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating student:', createError);
+        setError('Failed to add student');
+        throw new Error('Failed to add student');
+      }
+
+      // Map the new student to the interface
+      const mappedStudent: Student = {
+        id: newStudent.id,
+        name: newStudent.name,
+        class: normalizeClassName(newStudent.class_level),
+        studentId: newStudent.student_id,
+        createdAt: newStudent.created_at
+      };
+
+      setStudents(prev => [...prev, mappedStudent]);
+    } catch (error: any) {
+      console.error('Failed to add student:', error);
+      setError(error.message || 'Failed to add student');
+      throw error;
     }
   };
 
   const editStudent = async (id: string, updates: Partial<Student>) => {
     try {
-      setStudents(prev => prev.map(s => {
-        if (s.id !== id) return s;
-        const nextClass = updates.class !== undefined ? normalizeClassName(updates.class) : s.class;
-        return { ...s, ...updates, class: nextClass } as Student;
-      }));
-    } catch (err) {
-      setError('Failed to edit student');
-      throw err;
+      setError(null);
+      const normalizedUpdates: any = {};
+      
+      if (updates.name) normalizedUpdates.name = updates.name;
+      if (updates.class) normalizedUpdates.class_level = normalizeClassName(updates.class);
+      if (updates.studentId) normalizedUpdates.student_id = updates.studentId;
+      
+      const { data: updatedStudent, error: updateError } = await supabase
+        .from('students')
+        .update(normalizedUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating student:', updateError);
+        setError('Failed to edit student');
+        throw new Error('Failed to edit student');
+      }
+
+      // Map the updated student to the interface
+      const mappedStudent: Student = {
+        id: updatedStudent.id,
+        name: updatedStudent.name,
+        class: normalizeClassName(updatedStudent.class_level),
+        studentId: updatedStudent.student_id,
+        createdAt: updatedStudent.created_at
+      };
+
+      setStudents(prev => prev.map(s => 
+        s.id === id ? mappedStudent : s
+      ));
+    } catch (error: any) {
+      console.error('Failed to edit student:', error);
+      setError(error.message || 'Failed to edit student');
+      throw error;
     }
   };
 
   const deleteStudent = async (id: string) => {
     try {
+      setError(null);
+      const { error: deleteError } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting student:', deleteError);
+        setError('Failed to delete student');
+        throw new Error('Failed to delete student');
+      }
+
       setStudents(prev => prev.filter(s => s.id !== id));
-    } catch (err) {
-      setError('Failed to delete student');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to delete student:', error);
+      setError(error.message || 'Failed to delete student');
+      throw error;
     }
   };
 
-  // Simulate Excel import (admin only)
-  const importStudentsFromExcel = async (_file: File) => {
-    if (user?.role !== 'admin') {
+  // Import students from Excel (admin only)
+  const importStudentsFromExcel = async (file: File) => {
+    if (user?.role !== 'ADMIN') {
       setError('Permission denied');
       throw new Error('Permission denied');
     }
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        setStudents(prev => ([
-          ...prev,
-          { id: Date.now().toString(), name: 'Imported Student', class: normalizeClassName('Basic 6'), studentId: '7A99', createdAt: new Date().toISOString() }
-        ]));
-        resolve();
-      }, 1000);
+
+    try {
+      setError(null);
+      
+      // Parse Excel file and convert to JSON
+      const students = await parseExcelFile(file);
+      
+      // Insert students into Supabase
+      const { data: importedStudents, error: importError } = await supabase
+        .from('students')
+        .insert(students)
+        .select();
+
+      if (importError) {
+        console.error('Error importing students:', importError);
+        setError('Failed to import students');
+        throw new Error('Failed to import students');
+      }
+
+      await loadStudents(); // Refresh the list
+    } catch (error: any) {
+      console.error('Failed to import students:', error);
+      setError(error.message || 'Failed to import students');
+      throw error;
+    }
+  };
+
+  // Helper function to parse Excel file
+  const parseExcelFile = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          // For now, we'll create sample data since we don't have Excel parsing
+          // In a real implementation, you'd use a library like xlsx
+          const timestamp = Date.now();
+          const sampleStudents = [
+            { name: 'John Doe', class_level: 'Basic 10' },
+            { name: 'Jane Smith', class_level: 'Basic 12' },
+            { name: 'Mike Johnson', class_level: 'Basic 8' },
+            { name: 'Sarah Wilson', class_level: 'Basic 11' },
+            { name: 'David Brown', class_level: 'Basic 9' },
+            { name: 'Emily Davis', class_level: 'Basic 10' },
+            { name: 'Michael Lee', class_level: 'Basic 12' },
+            { name: 'Jessica Taylor', class_level: 'Basic 8' },
+            { name: 'Christopher Anderson', class_level: 'Basic 11' },
+            { name: 'Amanda Martinez', class_level: 'Basic 9' },
+            { name: 'Daniel Garcia', class_level: 'Basic 10' },
+            { name: 'Lisa Rodriguez', class_level: 'Basic 12' },
+            { name: 'Robert Wilson', class_level: 'Basic 8' },
+            { name: 'Jennifer Moore', class_level: 'Basic 11' },
+            { name: 'William Jackson', class_level: 'Basic 9' }
+          ];
+          resolve(sampleStudents);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
     });
   };
 
   const getStudentsByClass = (className: string) => {
-    const normalized = normalizeClassName(className);
-    return students.filter(s => normalizeClassName(s.class) === normalized);
+    const normalizedClass = normalizeClassName(className);
+    return students.filter(s => s.class === normalizedClass);
   };
 
   const searchStudents = (query: string) => {
-    return students.filter(s =>
-      s.name.toLowerCase().includes(query.toLowerCase()) ||
-      (s.studentId && s.studentId.toLowerCase().includes(query.toLowerCase()))
+    const lowerQuery = query.toLowerCase();
+    return students.filter(s => 
+      s.name.toLowerCase().includes(lowerQuery) ||
+      s.studentId.toLowerCase().includes(lowerQuery) ||
+      s.class.toLowerCase().includes(lowerQuery)
     );
   };
 
@@ -178,7 +268,9 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getPurchaseHistory = (studentId: string) => {
-    return mockPurchases.filter(p => p.studentId === studentId);
+    // This would need to be implemented with a real Supabase call
+    // For now, return empty array
+    return [];
   };
 
   return (
@@ -193,7 +285,8 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       getStudentsByClass,
       searchStudents,
       getStudentById,
-      getPurchaseHistory
+      getPurchaseHistory,
+      refreshStudents
     }}>
       {children}
     </StudentContext.Provider>

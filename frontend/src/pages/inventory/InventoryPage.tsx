@@ -33,7 +33,7 @@ const InventoryPage: React.FC = () => {
     getLowStockBooks
   } = useInventory();
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'ADMIN';
   // const isCashier = user?.role === 'cashier';
 
   const [activeTab, setActiveTab] = useState<'current' | 'alerts' | 'history'>('current');

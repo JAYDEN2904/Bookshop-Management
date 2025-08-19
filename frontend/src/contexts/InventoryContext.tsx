@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Book, StockHistory } from '../types';
 import { useAuth } from './AuthContext';
+import { supabase } from '../config/supabase';
 
 interface InventoryContextType {
   books: Book[];
@@ -24,6 +25,7 @@ interface InventoryContextType {
   // Utilities
   getLowStockBooks: () => Book[];
   getBookById: (id: string) => Book | undefined;
+  refreshBooks: () => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -36,892 +38,6 @@ export const useInventory = () => {
   return context;
 };
 
-// Mock data for demonstration
-const mockBooks: Book[] = [
-  // Basic 9 Books
-  {
-    id: 'b1',
-    author: 'John Smith',
-    class: 'Basic 9',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 50,
-    costPrice: 35,
-    stock: 10,
-    minStock: 5,
-    supplier: 'ABC Publishers',
-    description: 'Comprehensive mathematics textbook for Basic 9',
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-15'
-  },
-  {
-    id: 'b2',
-    author: 'Jane Doe',
-    class: 'Basic 9',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 40,
-    costPrice: 28,
-    stock: 5,
-    minStock: 3,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 9',
-    createdAt: '2024-01-02',
-    updatedAt: '2024-01-10'
-  },
-  {
-    id: 'b3',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 9',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 60,
-    costPrice: 42,
-    stock: 0,
-    minStock: 5,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 9',
-    createdAt: '2024-01-03',
-    updatedAt: '2024-01-12'
-  },
-  {
-    id: 'b4',
-    author: 'Mary Johnson',
-    class: 'Basic 9',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 45,
-    costPrice: 32,
-    stock: 8,
-    minStock: 4,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 9',
-    createdAt: '2024-01-04',
-    updatedAt: '2024-01-08'
-  },
-  {
-    id: 'b5',
-    author: 'Pierre Dubois',
-    class: 'Basic 9',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 12,
-    minStock: 6,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 9',
-    createdAt: '2024-01-05',
-    updatedAt: '2024-01-09'
-  },
-  {
-    id: 'b6',
-    author: 'Tech Solutions',
-    class: 'Basic 9',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 55,
-    costPrice: 40,
-    stock: 15,
-    minStock: 7,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 9',
-    createdAt: '2024-01-06',
-    updatedAt: '2024-01-11'
-  },
-  
-  // Basic 8 Books
-  {
-    id: 'b7',
-    author: 'John Smith',
-    class: 'Basic 8',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 45,
-    costPrice: 32,
-    stock: 8,
-    minStock: 4,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 8',
-    createdAt: '2024-01-07',
-    updatedAt: '2024-01-13'
-  },
-  {
-    id: 'b8',
-    author: 'Jane Doe',
-    class: 'Basic 8',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 38,
-    costPrice: 27,
-    stock: 12,
-    minStock: 6,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 8',
-    createdAt: '2024-01-08',
-    updatedAt: '2024-01-14'
-  },
-  {
-    id: 'b9',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 8',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 55,
-    costPrice: 39,
-    stock: 3,
-    minStock: 5,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 8',
-    createdAt: '2024-01-09',
-    updatedAt: '2024-01-15'
-  },
-  {
-    id: 'b10',
-    author: 'Mary Johnson',
-    class: 'Basic 8',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 42,
-    costPrice: 30,
-    stock: 10,
-    minStock: 5,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 8',
-    createdAt: '2024-01-10',
-    updatedAt: '2024-01-16'
-  },
-  {
-    id: 'b11',
-    author: 'Pierre Dubois',
-    class: 'Basic 8',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 7,
-    minStock: 4,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 8',
-    createdAt: '2024-01-11',
-    updatedAt: '2024-01-17'
-  },
-  {
-    id: 'b12',
-    author: 'Tech Solutions',
-    class: 'Basic 8',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 50,
-    costPrice: 36,
-    stock: 13,
-    minStock: 6,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 8',
-    createdAt: '2024-01-12',
-    updatedAt: '2024-01-18'
-  },
-  
-  // Basic 7 Books
-  {
-    id: 'b13',
-    author: 'John Smith',
-    class: 'Basic 7',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 42,
-    costPrice: 30,
-    stock: 15,
-    minStock: 7,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 7',
-    createdAt: '2024-01-13',
-    updatedAt: '2024-01-19'
-  },
-  {
-    id: 'b14',
-    author: 'Jane Doe',
-    class: 'Basic 7',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 9,
-    minStock: 5,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 7',
-    createdAt: '2024-01-14',
-    updatedAt: '2024-01-20'
-  },
-  {
-    id: 'b15',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 7',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 48,
-    costPrice: 34,
-    stock: 11,
-    minStock: 6,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 7',
-    createdAt: '2024-01-15',
-    updatedAt: '2024-01-21'
-  },
-  {
-    id: 'b16',
-    author: 'Mary Johnson',
-    class: 'Basic 7',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 38,
-    costPrice: 27,
-    stock: 6,
-    minStock: 4,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 7',
-    createdAt: '2024-01-16',
-    updatedAt: '2024-01-22'
-  },
-  {
-    id: 'b17',
-    author: 'Pierre Dubois',
-    class: 'Basic 7',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 30,
-    costPrice: 21,
-    stock: 14,
-    minStock: 7,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 7',
-    createdAt: '2024-01-17',
-    updatedAt: '2024-01-23'
-  },
-  {
-    id: 'b18',
-    author: 'Tech Solutions',
-    class: 'Basic 7',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 45,
-    costPrice: 32,
-    stock: 8,
-    minStock: 4,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 7',
-    createdAt: '2024-01-18',
-    updatedAt: '2024-01-24'
-  },
-  
-  // Basic 6 Books
-  {
-    id: 'b19',
-    author: 'John Smith',
-    class: 'Basic 6',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 40,
-    costPrice: 28,
-    stock: 12,
-    minStock: 6,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 6',
-    createdAt: '2024-01-19',
-    updatedAt: '2024-01-25'
-  },
-  {
-    id: 'b20',
-    author: 'Jane Doe',
-    class: 'Basic 6',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 16,
-    minStock: 8,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 6',
-    createdAt: '2024-01-20',
-    updatedAt: '2024-01-26'
-  },
-  {
-    id: 'b21',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 6',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 45,
-    costPrice: 32,
-    stock: 7,
-    minStock: 4,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 6',
-    createdAt: '2024-01-21',
-    updatedAt: '2024-01-27'
-  },
-  {
-    id: 'b22',
-    author: 'Mary Johnson',
-    class: 'Basic 6',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 9,
-    minStock: 5,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 6',
-    createdAt: '2024-01-22',
-    updatedAt: '2024-01-28'
-  },
-  {
-    id: 'b23',
-    author: 'Pierre Dubois',
-    class: 'Basic 6',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 28,
-    costPrice: 20,
-    stock: 11,
-    minStock: 6,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 6',
-    createdAt: '2024-01-23',
-    updatedAt: '2024-01-29'
-  },
-  {
-    id: 'b24',
-    author: 'Tech Solutions',
-    class: 'Basic 6',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 40,
-    costPrice: 28,
-    stock: 10,
-    minStock: 5,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 6',
-    createdAt: '2024-01-24',
-    updatedAt: '2024-01-30'
-  },
-  
-  // Basic 5 Books
-  {
-    id: 'b25',
-    author: 'John Smith',
-    class: 'Basic 5',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 38,
-    costPrice: 27,
-    stock: 18,
-    minStock: 9,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 5',
-    createdAt: '2024-01-25',
-    updatedAt: '2024-01-31'
-  },
-  {
-    id: 'b26',
-    author: 'Jane Doe',
-    class: 'Basic 5',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 30,
-    costPrice: 21,
-    stock: 14,
-    minStock: 7,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 5',
-    createdAt: '2024-01-26',
-    updatedAt: '2024-02-01'
-  },
-  {
-    id: 'b27',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 5',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 42,
-    costPrice: 30,
-    stock: 13,
-    minStock: 7,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 5',
-    createdAt: '2024-01-27',
-    updatedAt: '2024-02-02'
-  },
-  {
-    id: 'b28',
-    author: 'Mary Johnson',
-    class: 'Basic 5',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 8,
-    minStock: 4,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 5',
-    createdAt: '2024-01-28',
-    updatedAt: '2024-02-03'
-  },
-  {
-    id: 'b29',
-    author: 'Pierre Dubois',
-    class: 'Basic 5',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 25,
-    costPrice: 18,
-    stock: 12,
-    minStock: 6,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 5',
-    createdAt: '2024-01-29',
-    updatedAt: '2024-02-04'
-  },
-  {
-    id: 'b30',
-    author: 'Tech Solutions',
-    class: 'Basic 5',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 38,
-    costPrice: 27,
-    stock: 9,
-    minStock: 5,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 5',
-    createdAt: '2024-01-30',
-    updatedAt: '2024-02-05'
-  },
-  
-  // Basic 4 Books
-  {
-    id: 'b31',
-    author: 'John Smith',
-    class: 'Basic 4',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 20,
-    minStock: 10,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 4',
-    createdAt: '2024-01-31',
-    updatedAt: '2024-02-06'
-  },
-  {
-    id: 'b32',
-    author: 'Jane Doe',
-    class: 'Basic 4',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 28,
-    costPrice: 20,
-    stock: 17,
-    minStock: 9,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 4',
-    createdAt: '2024-02-01',
-    updatedAt: '2024-02-07'
-  },
-  {
-    id: 'b33',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 4',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 40,
-    costPrice: 28,
-    stock: 15,
-    minStock: 8,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 4',
-    createdAt: '2024-02-02',
-    updatedAt: '2024-02-08'
-  },
-  {
-    id: 'b34',
-    author: 'Mary Johnson',
-    class: 'Basic 4',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 30,
-    costPrice: 21,
-    stock: 11,
-    minStock: 6,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 4',
-    createdAt: '2024-02-03',
-    updatedAt: '2024-02-09'
-  },
-  {
-    id: 'b35',
-    author: 'Pierre Dubois',
-    class: 'Basic 4',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 22,
-    costPrice: 15,
-    stock: 13,
-    minStock: 7,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 4',
-    createdAt: '2024-02-04',
-    updatedAt: '2024-02-10'
-  },
-  {
-    id: 'b36',
-    author: 'Tech Solutions',
-    class: 'Basic 4',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 12,
-    minStock: 6,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 4',
-    createdAt: '2024-02-05',
-    updatedAt: '2024-02-11'
-  },
-  
-  // Basic 3 Books
-  {
-    id: 'b37',
-    author: 'John Smith',
-    class: 'Basic 3',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 22,
-    minStock: 11,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 3',
-    createdAt: '2024-02-06',
-    updatedAt: '2024-02-12'
-  },
-  {
-    id: 'b38',
-    author: 'Jane Doe',
-    class: 'Basic 3',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 25,
-    costPrice: 18,
-    stock: 19,
-    minStock: 10,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 3',
-    createdAt: '2024-02-07',
-    updatedAt: '2024-02-13'
-  },
-  {
-    id: 'b39',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 3',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 38,
-    costPrice: 27,
-    stock: 16,
-    minStock: 8,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 3',
-    createdAt: '2024-02-08',
-    updatedAt: '2024-02-14'
-  },
-  {
-    id: 'b40',
-    author: 'Mary Johnson',
-    class: 'Basic 3',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 28,
-    costPrice: 20,
-    stock: 14,
-    minStock: 7,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 3',
-    createdAt: '2024-02-09',
-    updatedAt: '2024-02-15'
-  },
-  {
-    id: 'b41',
-    author: 'Pierre Dubois',
-    class: 'Basic 3',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 20,
-    costPrice: 14,
-    stock: 15,
-    minStock: 8,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 3',
-    createdAt: '2024-02-10',
-    updatedAt: '2024-02-16'
-  },
-  {
-    id: 'b42',
-    author: 'Tech Solutions',
-    class: 'Basic 3',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 13,
-    minStock: 7,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 3',
-    createdAt: '2024-02-11',
-    updatedAt: '2024-02-17'
-  },
-  
-  // Basic 2 Books
-  {
-    id: 'b43',
-    author: 'John Smith',
-    class: 'Basic 2',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 30,
-    costPrice: 21,
-    stock: 25,
-    minStock: 13,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 2',
-    createdAt: '2024-02-12',
-    updatedAt: '2024-02-18'
-  },
-  {
-    id: 'b44',
-    author: 'Jane Doe',
-    class: 'Basic 2',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 22,
-    costPrice: 15,
-    stock: 21,
-    minStock: 11,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 2',
-    createdAt: '2024-02-13',
-    updatedAt: '2024-02-19'
-  },
-  {
-    id: 'b45',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 2',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 35,
-    costPrice: 25,
-    stock: 18,
-    minStock: 9,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 2',
-    createdAt: '2024-02-14',
-    updatedAt: '2024-02-20'
-  },
-  {
-    id: 'b46',
-    author: 'Mary Johnson',
-    class: 'Basic 2',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 25,
-    costPrice: 18,
-    stock: 16,
-    minStock: 8,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 2',
-    createdAt: '2024-02-15',
-    updatedAt: '2024-02-21'
-  },
-  {
-    id: 'b47',
-    author: 'Pierre Dubois',
-    class: 'Basic 2',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 18,
-    costPrice: 13,
-    stock: 17,
-    minStock: 9,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 2',
-    createdAt: '2024-02-16',
-    updatedAt: '2024-02-22'
-  },
-  {
-    id: 'b48',
-    author: 'Tech Solutions',
-    class: 'Basic 2',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 30,
-    costPrice: 21,
-    stock: 14,
-    minStock: 7,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 2',
-    createdAt: '2024-02-17',
-    updatedAt: '2024-02-23'
-  },
-  
-  // Basic 1 Books
-  {
-    id: 'b49',
-    author: 'John Smith',
-    class: 'Basic 1',
-    subject: 'Mathematics',
-    type: 'textbook',
-    sellingPrice: 28,
-    costPrice: 20,
-    stock: 28,
-    minStock: 14,
-    supplier: 'ABC Publishers',
-    description: 'Mathematics textbook for Basic 1',
-    createdAt: '2024-02-18',
-    updatedAt: '2024-02-24'
-  },
-  {
-    id: 'b50',
-    author: 'Jane Doe',
-    class: 'Basic 1',
-    subject: 'English Grammar',
-    type: 'textbook',
-    sellingPrice: 20,
-    costPrice: 14,
-    stock: 24,
-    minStock: 12,
-    supplier: 'XYZ Publications',
-    description: 'English grammar textbook for Basic 1',
-    createdAt: '2024-02-19',
-    updatedAt: '2024-02-25'
-  },
-  {
-    id: 'b51',
-    author: 'Dr. Robert Wilson',
-    class: 'Basic 1',
-    subject: 'Science',
-    type: 'textbook',
-    sellingPrice: 32,
-    costPrice: 23,
-    stock: 20,
-    minStock: 10,
-    supplier: 'Science Publishers Ltd',
-    description: 'Science textbook for Basic 1',
-    createdAt: '2024-02-20',
-    updatedAt: '2024-02-26'
-  },
-  {
-    id: 'b52',
-    author: 'Mary Johnson',
-    class: 'Basic 1',
-    subject: 'Social Studies',
-    type: 'textbook',
-    sellingPrice: 22,
-    costPrice: 15,
-    stock: 18,
-    minStock: 9,
-    supplier: 'History Press',
-    description: 'Social studies textbook for Basic 1',
-    createdAt: '2024-02-21',
-    updatedAt: '2024-02-27'
-  },
-  {
-    id: 'b53',
-    author: 'Pierre Dubois',
-    class: 'Basic 1',
-    subject: 'French',
-    type: 'textbook',
-    sellingPrice: 15,
-    costPrice: 11,
-    stock: 19,
-    minStock: 10,
-    supplier: 'French Language Books',
-    description: 'French language textbook for Basic 1',
-    createdAt: '2024-02-22',
-    updatedAt: '2024-02-28'
-  },
-  {
-    id: 'b54',
-    author: 'Tech Solutions',
-    class: 'Basic 1',
-    subject: 'ICT',
-    type: 'textbook',
-    sellingPrice: 28,
-    costPrice: 20,
-    stock: 16,
-    minStock: 8,
-    supplier: 'Tech Publishers',
-    description: 'Information and Communication Technology for Basic 1',
-    createdAt: '2024-02-23',
-    updatedAt: '2024-02-29'
-  }
-];
-
-const mockStockHistory: StockHistory[] = [
-  {
-    id: '1',
-    bookId: '1',
-    type: 'addition',
-    quantity: 50,
-    previousStock: 0,
-    newStock: 50,
-    reference: 'Initial stock',
-    note: 'Initial inventory setup',
-    userId: '1',
-    userName: 'John Admin',
-    createdAt: '2024-01-01T10:00:00Z'
-  },
-  {
-    id: '2',
-    bookId: '1',
-    type: 'reduction',
-    quantity: 5,
-    previousStock: 50,
-    newStock: 45,
-    reference: 'Sales',
-    note: 'Sold to students',
-    userId: '2',
-    userName: 'Sarah Cashier',
-    createdAt: '2024-01-15T14:30:00Z'
-  },
-  {
-    id: '3',
-    bookId: '2',
-    type: 'addition',
-    quantity: 20,
-    previousStock: 0,
-    newStock: 20,
-    reference: 'Supplier delivery',
-    note: 'New stock received',
-    userId: '1',
-    userName: 'John Admin',
-    createdAt: '2024-01-05T09:15:00Z'
-  },
-  {
-    id: '4',
-    bookId: '2',
-    type: 'reduction',
-    quantity: 17,
-    previousStock: 20,
-    newStock: 3,
-    reference: 'Sales',
-    note: 'High demand period',
-    userId: '2',
-    userName: 'Sarah Cashier',
-    createdAt: '2024-01-10T16:45:00Z'
-  }
-];
-
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [books, setBooks] = useState<Book[]>([]);
   const [stockHistory, setStockHistory] = useState<StockHistory[]>([]);
@@ -929,82 +45,214 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // Load books from Supabase
+  const loadBooks = async () => {
+    try {
+      setError(null);
+      const { data: booksData, error: fetchError } = await supabase
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        console.error('Error fetching books:', fetchError);
+        setError('Failed to load books');
+        return;
+      }
+
+      // Map Supabase field names to Book interface
+      const mappedBooks: Book[] = (booksData || []).map(book => ({
+        id: book.id,
+        author: book.author,
+        class: book.class_level,
+        subject: book.subject,
+        type: book.type,
+        sellingPrice: book.price,
+        costPrice: book.cost_price,
+        stock: book.stock_quantity,
+        minStock: book.min_stock,
+        supplier: book.supplier_name,
+        description: book.description,
+        createdAt: book.created_at,
+        updatedAt: book.updated_at
+      }));
+
+      setBooks(mappedBooks);
+    } catch (error: any) {
+      console.error('Failed to load books:', error);
+      setError(error.message || 'Failed to load books');
+    }
+  };
+
   useEffect(() => {
-    // Load mock data
-    setBooks(mockBooks);
-    setStockHistory(mockStockHistory);
+    if (user) {
+      loadBooks();
+    }
     setIsLoading(false);
-  }, []);
+  }, [user]);
+
+  const refreshBooks = async () => {
+    setIsLoading(true);
+    await loadBooks();
+    setIsLoading(false);
+  };
 
   const addBook = async (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
     try {
-      const newBook: Book = {
-        ...bookData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      setError(null);
+      const normalizedData = {
+        title: bookData.author, // Using author as title for now
+        author: bookData.author,
+        class_level: bookData.class,
+        subject: bookData.subject,
+        type: bookData.type,
+        price: bookData.sellingPrice,
+        cost_price: bookData.costPrice,
+        stock_quantity: bookData.stock,
+        min_stock: bookData.minStock,
+        supplier_name: bookData.supplier,
+        description: bookData.description
       };
-      
-      setBooks(prev => [...prev, newBook]);
-      
-      // Add initial stock history entry
-      const initialHistory: StockHistory = {
-        id: Date.now().toString(),
-        bookId: newBook.id,
-        type: 'addition',
-        quantity: newBook.stock,
-        previousStock: 0,
-        newStock: newBook.stock,
-        reference: 'Initial stock',
-        note: 'Book added to inventory',
-        userId: user?.id || '',
-        userName: user?.name || '',
-        createdAt: new Date().toISOString()
+
+      const { data: newBook, error: createError } = await supabase
+        .from('books')
+        .insert([normalizedData])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating book:', createError);
+        setError('Failed to add book');
+        throw new Error('Failed to add book');
+      }
+
+      // Map the new book to the interface
+      const mappedBook: Book = {
+        id: newBook.id,
+        author: newBook.author,
+        class: newBook.class_level,
+        subject: newBook.subject,
+        type: newBook.type,
+        sellingPrice: newBook.price,
+        costPrice: newBook.cost_price,
+        stock: newBook.stock_quantity,
+        minStock: newBook.min_stock,
+        supplier: newBook.supplier_name,
+        description: newBook.description,
+        createdAt: newBook.created_at,
+        updatedAt: newBook.updated_at
       };
-      
-      setStockHistory(prev => [...prev, initialHistory]);
-    } catch (err) {
-      setError('Failed to add book');
-      throw err;
+
+      setBooks(prev => [...prev, mappedBook]);
+    } catch (error: any) {
+      console.error('Failed to add book:', error);
+      setError(error.message || 'Failed to add book');
+      throw error;
     }
   };
 
   const updateBook = async (id: string, updates: Partial<Book>): Promise<void> => {
     try {
+      setError(null);
+      const normalizedUpdates: any = {};
+      
+      if (updates.author) normalizedUpdates.author = updates.author;
+      if (updates.class) normalizedUpdates.class_level = updates.class;
+      if (updates.subject) normalizedUpdates.subject = updates.subject;
+      if (updates.type) normalizedUpdates.type = updates.type;
+      if (updates.sellingPrice) normalizedUpdates.price = updates.sellingPrice;
+      if (updates.costPrice) normalizedUpdates.cost_price = updates.costPrice;
+      if (updates.stock) normalizedUpdates.stock_quantity = updates.stock;
+      if (updates.minStock) normalizedUpdates.min_stock = updates.minStock;
+      if (updates.supplier) normalizedUpdates.supplier_name = updates.supplier;
+      if (updates.description) normalizedUpdates.description = updates.description;
+
+      const { data: updatedBook, error: updateError } = await supabase
+        .from('books')
+        .update(normalizedUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating book:', updateError);
+        setError('Failed to update book');
+        throw new Error('Failed to update book');
+      }
+
+      // Map the updated book to the interface
+      const mappedBook: Book = {
+        id: updatedBook.id,
+        author: updatedBook.author,
+        class: updatedBook.class_level,
+        subject: updatedBook.subject,
+        type: updatedBook.type,
+        sellingPrice: updatedBook.price,
+        costPrice: updatedBook.cost_price,
+        stock: updatedBook.stock_quantity,
+        minStock: updatedBook.min_stock,
+        supplier: updatedBook.supplier_name,
+        description: updatedBook.description,
+        createdAt: updatedBook.created_at,
+        updatedAt: updatedBook.updated_at
+      };
+
       setBooks(prev => prev.map(book => 
-        book.id === id 
-          ? { ...book, ...updates, updatedAt: new Date().toISOString() }
-          : book
+        book.id === id ? mappedBook : book
       ));
-    } catch (err) {
-      setError('Failed to update book');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to update book:', error);
+      setError(error.message || 'Failed to update book');
+      throw error;
     }
   };
 
   const deleteBook = async (id: string): Promise<void> => {
     try {
+      setError(null);
+      const { error: deleteError } = await supabase
+        .from('books')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting book:', deleteError);
+        setError('Failed to delete book');
+        throw new Error('Failed to delete book');
+      }
+
       setBooks(prev => prev.filter(book => book.id !== id));
       setStockHistory(prev => prev.filter(history => history.bookId !== id));
-    } catch (err) {
-      setError('Failed to delete book');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to delete book:', error);
+      setError(error.message || 'Failed to delete book');
+      throw error;
     }
   };
 
   const addStock = async (bookId: string, quantity: number, reference?: string, note?: string): Promise<void> => {
     try {
+      setError(null);
       const book = books.find(b => b.id === bookId);
       if (!book) throw new Error('Book not found');
 
       const previousStock = book.stock;
       const newStock = previousStock + quantity;
 
-      // Update book stock
+      // Update book stock using Supabase RPC function
+      const { error: updateError } = await supabase.rpc('update_book_stock', {
+        book_id: bookId,
+        new_quantity: newStock
+      });
+
+      if (updateError) {
+        console.error('Error updating stock:', updateError);
+        setError('Failed to update stock');
+        throw new Error('Failed to update stock');
+      }
+
       setBooks(prev => prev.map(b => 
-        b.id === bookId 
-          ? { ...b, stock: newStock, updatedAt: new Date().toISOString() }
-          : b
+        b.id === bookId ? { ...b, stock: newStock } : b
       ));
 
       // Add stock history entry
@@ -1023,25 +271,36 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       setStockHistory(prev => [...prev, historyEntry]);
-    } catch (err) {
-      setError('Failed to add stock');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to add stock:', error);
+      setError(error.message || 'Failed to add stock');
+      throw error;
     }
   };
 
   const markWastage = async (bookId: string, quantity: number, note?: string): Promise<void> => {
     try {
+      setError(null);
       const book = books.find(b => b.id === bookId);
       if (!book) throw new Error('Book not found');
 
       const previousStock = book.stock;
       const newStock = Math.max(0, previousStock - quantity);
 
-      // Update book stock
+      // Update book stock using Supabase RPC function
+      const { error: updateError } = await supabase.rpc('update_book_stock', {
+        book_id: bookId,
+        new_quantity: newStock
+      });
+
+      if (updateError) {
+        console.error('Error updating stock:', updateError);
+        setError('Failed to mark wastage');
+        throw new Error('Failed to mark wastage');
+      }
+
       setBooks(prev => prev.map(b => 
-        b.id === bookId 
-          ? { ...b, stock: newStock, updatedAt: new Date().toISOString() }
-          : b
+        b.id === bookId ? { ...b, stock: newStock } : b
       ));
 
       // Add stock history entry
@@ -1052,6 +311,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity,
         previousStock,
         newStock,
+        reference: 'Wastage',
         note,
         userId: user?.id || '',
         userName: user?.name || '',
@@ -1059,25 +319,36 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       setStockHistory(prev => [...prev, historyEntry]);
-    } catch (err) {
-      setError('Failed to mark wastage');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to mark wastage:', error);
+      setError(error.message || 'Failed to mark wastage');
+      throw error;
     }
   };
 
   const markReturn = async (bookId: string, quantity: number, note?: string): Promise<void> => {
     try {
+      setError(null);
       const book = books.find(b => b.id === bookId);
       if (!book) throw new Error('Book not found');
 
       const previousStock = book.stock;
       const newStock = previousStock + quantity;
 
-      // Update book stock
+      // Update book stock using Supabase RPC function
+      const { error: updateError } = await supabase.rpc('update_book_stock', {
+        book_id: bookId,
+        new_quantity: newStock
+      });
+
+      if (updateError) {
+        console.error('Error updating stock:', updateError);
+        setError('Failed to mark return');
+        throw new Error('Failed to mark return');
+      }
+
       setBooks(prev => prev.map(b => 
-        b.id === bookId 
-          ? { ...b, stock: newStock, updatedAt: new Date().toISOString() }
-          : b
+        b.id === bookId ? { ...b, stock: newStock } : b
       ));
 
       // Add stock history entry
@@ -1088,6 +359,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         quantity,
         previousStock,
         newStock,
+        reference: 'Return',
         note,
         userId: user?.id || '',
         userName: user?.name || '',
@@ -1095,9 +367,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       setStockHistory(prev => [...prev, historyEntry]);
-    } catch (err) {
-      setError('Failed to mark return');
-      throw err;
+    } catch (error: any) {
+      console.error('Failed to mark return:', error);
+      setError(error.message || 'Failed to mark return');
+      throw error;
     }
   };
 
@@ -1127,7 +400,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       markReturn,
       getStockHistory,
       getLowStockBooks,
-      getBookById
+      getBookById,
+      refreshBooks
     }}>
       {children}
     </InventoryContext.Provider>
