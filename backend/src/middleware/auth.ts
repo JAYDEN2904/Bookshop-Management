@@ -11,6 +11,7 @@ export interface AuthRequest extends Request {
     created_at: string;
     updated_at: string;
   };
+  headers: Request['headers'];
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {

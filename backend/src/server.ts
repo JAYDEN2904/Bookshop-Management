@@ -51,6 +51,28 @@ app.use(express.urlencoded({ extended: true }));
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Bookshop Management System API',
+    version: process.env.npm_package_version || '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      users: '/api/users',
+      books: '/api/books',
+      students: '/api/students',
+      suppliers: '/api/suppliers',
+      purchases: '/api/purchases',
+      reports: '/api/reports',
+      storage: '/api/storage'
+    },
+    documentation: 'This is the backend API for the Bookshop Management System'
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 
@@ -84,6 +106,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+    console.log(`🌍 Server bound to 0.0.0.0:${PORT}`);
   });
 }
 
