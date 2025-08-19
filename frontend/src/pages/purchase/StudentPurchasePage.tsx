@@ -810,7 +810,7 @@ const StudentPurchasePage: React.FC = () => {
       </Modal>
 
       {/* Admin-only: Bundle Management */}
-      {user?.role === 'admin' && (
+      {user?.role === 'ADMIN' && (
           <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Class Bundles</h3>
@@ -1044,7 +1044,7 @@ const StudentPurchasePage: React.FC = () => {
               <option value="bank">Bank Transfer</option>
               <option value="other">Other</option>
             </select>
-            {user?.role === 'admin' && (
+            {user?.role === 'ADMIN' && (
               <Button size="sm" variant="outline" onClick={handleExportCSV}>
                 <Download className="h-4 w-4 mr-1" /> Export CSV
               </Button>
