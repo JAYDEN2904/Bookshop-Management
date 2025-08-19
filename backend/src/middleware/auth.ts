@@ -4,6 +4,11 @@ import { supabase } from '../config/supabase';
 
 export interface AuthRequest extends Request {
   user?: any;
+  headers: Request['headers'];
+  params: Request['params'];
+  query: Request['query'];
+  body: Request['body'];
+  file?: any;
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
