@@ -264,8 +264,8 @@ router.post('/import', protect, authorize('ADMIN'), async (req, res) => {
       });
     }
 
-    const importedStudents = [];
-    const errors = [];
+    const importedStudents: any[] = [];
+    const errors: string[] = [];
 
     for (let i = 0; i < students.length; i++) {
       const student = students[i];

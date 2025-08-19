@@ -61,9 +61,9 @@ router.post('/login', async (req, res) => {
     }
     
     const token = jwt.sign(
-      { id: user.id } as object,
+      { id: user.id },
       jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { expiresIn: '7d' }
     );
 
     // Remove password from response
