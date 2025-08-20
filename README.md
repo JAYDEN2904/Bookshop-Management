@@ -55,7 +55,46 @@ The frontend is a React application built with:
 
 ## Backend
 
-The backend API will be implemented here to support the frontend functionality.
+The backend is a Node.js/Express API built with:
+- **Node.js** with Express.js
+- **PostgreSQL** database with Prisma ORM
+- **JWT** authentication
+- **TypeScript** for type safety
+- **File upload** support for Excel imports
+
+### Getting Started
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp env.example .env
+   ```
+
+4. Set up the database:
+   ```bash
+   npm run db:generate
+   npm run db:push
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. The API will be available at `http://localhost:5000`
+
+### API Documentation
+
+See the [backend README](./backend/README.md) for detailed API documentation and setup instructions.
 
 ## Development
 

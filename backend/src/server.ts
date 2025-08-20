@@ -39,7 +39,7 @@ app.use(helmet({
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
+    ? [process.env.FRONTEND_URL, 'https://*.vercel.app', 'https://*.vercel.app/*']
     : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000'],
   credentials: true
 }));
