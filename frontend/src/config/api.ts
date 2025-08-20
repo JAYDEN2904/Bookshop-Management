@@ -1,16 +1,20 @@
-// API configuration for different environments
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 export const apiConfig = {
   baseURL: API_BASE_URL,
   endpoints: {
-    auth: '/api/auth',
+    auth: {
+      login: '/api/auth/login',
+      logout: '/api/auth/logout',
+      me: '/api/auth/me',
+    },
+    users: '/api/users',
     books: '/api/books',
     students: '/api/students',
     suppliers: '/api/suppliers',
     purchases: '/api/purchases',
     reports: '/api/reports',
-    users: '/api/users',
+    storage: '/api/storage',
   },
   headers: {
     'Content-Type': 'application/json',
@@ -57,6 +61,27 @@ export const api = {
   
   getCurrentUser: () => apiCall('/api/auth/me'),
 
+  // Users
+  getUsers: (params?: URLSearchParams) =>
+    apiCall(`/api/users${params ? `?${params}` : ''}`),
+  
+  getUser: (id: string) => apiCall(`/api/users/${id}`),
+  
+  createUser: (userData: any) =>
+    apiCall('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    }),
+  
+  updateUser: (id: string, userData: any) =>
+    apiCall(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    }),
+  
+  deleteUser: (id: string) =>
+    apiCall(`/api/users/${id}`, { method: 'DELETE' }),
+
   // Books
   getBooks: (params?: URLSearchParams) =>
     apiCall(`/api/books${params ? `?${params}` : ''}`),
@@ -96,14 +121,8 @@ export const api = {
       body: JSON.stringify(studentData),
     }),
   
-           deleteStudent: (id: string) =>
-           apiCall(`/api/students/${id}`, { method: 'DELETE' }),
-         
-         importStudents: (students: any[]) =>
-           apiCall('/api/students/import', {
-             method: 'POST',
-             body: JSON.stringify({ students }),
-           }),
+  deleteStudent: (id: string) =>
+    apiCall(`/api/students/${id}`, { method: 'DELETE' }),
 
   // Suppliers
   getSuppliers: (params?: URLSearchParams) =>
@@ -137,35 +156,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(purchaseData),
     }),
+  
+  updatePurchase: (id: string, purchaseData: any) =>
+    apiCall(`/api/purchases/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(purchaseData),
+    }),
+  
+  deletePurchase: (id: string) =>
+    apiCall(`/api/purchases/${id}`, { method: 'DELETE' }),
 
   // Reports
-  getSalesReport: (params?: URLSearchParams) =>
-    apiCall(`/api/reports/sales${params ? `?${params}` : ''}`),
+  getReports: (params?: URLSearchParams) =>
+    apiCall(`/api/reports${params ? `?${params}` : ''}`),
   
-  getInventoryReport: (params?: URLSearchParams) =>
-    apiCall(`/api/reports/inventory${params ? `?${params}` : ''}`),
-  
-  getSupplierReport: (params?: URLSearchParams) =>
-    apiCall(`/api/reports/suppliers${params ? `?${params}` : ''}`),
-
-  // Users
-  getUsers: (params?: URLSearchParams) =>
-    apiCall(`/api/users${params ? `?${params}` : ''}`),
-  
-  getUser: (id: string) => apiCall(`/api/users/${id}`),
-  
-  createUser: (userData: any) =>
-    apiCall('/api/users', {
+  generateReport: (reportData: any) =>
+    apiCall('/api/reports', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(reportData),
     }),
-  
-  updateUser: (id: string, userData: any) =>
-    apiCall(`/api/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    }),
-  
-  deleteUser: (id: string) =>
-    apiCall(`/api/users/${id}`, { method: 'DELETE' }),
 };
+
+export default apiConfig;
