@@ -1,4 +1,4 @@
-import express, { Response } from 'express';
+import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { StorageService, STORAGE_BUCKETS } from '../config/storage';
 import { supabase } from '../config/supabase';
@@ -15,7 +15,7 @@ const upload = multer({
 });
 
 // Upload file to a specific bucket
-router.post('/upload/:bucket', protect, upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/upload/:bucket', protect, upload.single('file'), async (req: Request & AuthRequest, res: Response) => {
   try {
     const { bucket } = req.params;
     const file = req.file;
@@ -83,7 +83,7 @@ router.post('/upload/:bucket', protect, upload.single('file'), async (req: AuthR
 });
 
 // Get file attachments for an entity
-router.get('/attachments/:entityType/:entityId', protect, async (req: AuthRequest, res: Response) => {
+router.get('/attachments/:entityType/:entityId', protect, async (req: Request & AuthRequest, res: Response) => {
   try {
     const { entityType, entityId } = req.params;
 
@@ -107,7 +107,7 @@ router.get('/attachments/:entityType/:entityId', protect, async (req: AuthReques
 });
 
 // Delete file attachment
-router.delete('/attachments/:attachmentId', protect, async (req: AuthRequest, res: Response) => {
+router.delete('/attachments/:attachmentId', protect, async (req: Request & AuthRequest, res: Response) => {
   try {
     const { attachmentId } = req.params;
 
@@ -147,7 +147,7 @@ router.delete('/attachments/:attachmentId', protect, async (req: AuthRequest, re
 });
 
 // Download file
-router.get('/download/:bucket/:fileName', protect, async (req: AuthRequest, res: Response) => {
+router.get('/download/:bucket/:fileName', protect, async (req: Request & AuthRequest, res: Response) => {
   try {
     const { bucket, fileName } = req.params;
 
@@ -181,7 +181,7 @@ router.get('/download/:bucket/:fileName', protect, async (req: AuthRequest, res:
 });
 
 // List files in a bucket
-router.get('/list/:bucket', protect, async (req: AuthRequest, res: Response) => {
+router.get('/list/:bucket', protect, async (req: Request & AuthRequest, res: Response) => {
   try {
     const { bucket } = req.params;
     const { folder } = req.query;
@@ -205,7 +205,7 @@ router.get('/list/:bucket', protect, async (req: AuthRequest, res: Response) => 
 });
 
 // Get storage bucket info
-router.get('/buckets', protect, async (req: AuthRequest, res: Response) => {
+router.get('/buckets', protect, async (req: Request & AuthRequest, res: Response) => {
   try {
     const buckets = Object.values(STORAGE_BUCKETS).map(bucket => ({
       name: bucket,

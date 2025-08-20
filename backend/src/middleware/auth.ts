@@ -3,7 +3,15 @@ import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    created_at: string;
+    updated_at: string;
+  };
+  headers: Request['headers'];
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
