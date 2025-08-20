@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import apiConfig from '../config/api';
 
 interface AuthContextType {
   user: User | null;
@@ -52,19 +53,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication
-    const foundUser = mockUsers.find(u => u.email === email);
-    if (foundUser && password === 'password') {
-      setUser(foundUser);
-      localStorage.setItem('bookshop_user', JSON.stringify(foundUser));
-      return true;
+    try {
+      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.auth.login}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+          localStorage.setItem('bookshop_user', JSON.stringify(data.user));
+          localStorage.setItem('bookshop_token', data.token);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('bookshop_user');
+  const logout = async () => {
+    try {
+      const token = localStorage.getItem('bookshop_token');
+      if (token) {
+        await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.auth.logout}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('bookshop_user');
+      localStorage.removeItem('bookshop_token');
+    }
   };
 
   return (
