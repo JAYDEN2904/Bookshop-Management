@@ -50,7 +50,7 @@ const CashierDashboard: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Cashier Dashboard</h1>
-        <p className="text-gray-600">Your daily sales overview</p>
+        <p className="text-gray-600">Welcome back! Here's your daily sales overview</p>
       </div>
 
       {/* Today's Sales Summary */}

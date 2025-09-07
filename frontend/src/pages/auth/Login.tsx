@@ -7,7 +7,7 @@ import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
-  const { user, login } = useAuth();
+  const { user, login, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,10 +25,10 @@ const Login: React.FC = () => {
       if (success) {
         toast.success('Welcome back!');
       } else {
-        toast.error('Invalid credentials. Try admin@school.com / password');
+        toast.error(error || 'Invalid credentials. Please try again.');
       }
-    } catch (error) {
-      toast.error('Login failed. Please try again.');
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -47,14 +47,14 @@ const Login: React.FC = () => {
             <p className="text-gray-600">Sign in to your bookshop account</p>
           </div>
 
-          {/* Demo Credentials */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <p><strong>Admin:</strong> admin@school.com / password</p>
-              <p><strong>Cashier:</strong> cashier@school.com / password</p>
+          
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800">{error}</p>
             </div>
-          </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -98,7 +98,7 @@ const Login: React.FC = () => {
             <p className="text-sm text-gray-600">
               First time here?{' '}
               <Link to="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
-                Set up your account
+                Create an account
               </Link>
             </p>
           </div>

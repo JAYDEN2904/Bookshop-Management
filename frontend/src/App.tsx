@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { InventoryProvider } from './contexts/InventoryContext';
 import { StudentProvider } from './contexts/StudentContext';
 import { SupplierProvider } from './contexts/SupplierContext';
+import { UserProvider } from './contexts/UserContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
@@ -35,7 +36,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
     return <Navigate to="/login" replace />;
   }
 
-  if (adminOnly && user.role !== 'admin') {
+  if (adminOnly && user.role !== 'ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -44,7 +45,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  return user?.role === 'admin' ? <AdminDashboard /> : <CashierDashboard />;
+  return user?.role === 'ADMIN' ? <AdminDashboard /> : <CashierDashboard />;
 };
 
 function App() {
@@ -53,7 +54,8 @@ function App() {
       <InventoryProvider>
         <StudentProvider>
           <SupplierProvider>
-            <Router>
+            <UserProvider>
+              <Router>
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
@@ -87,6 +89,7 @@ function App() {
                 </Route>
               </Routes>
             </Router>
+            </UserProvider>
           </SupplierProvider>
         </StudentProvider>
       </InventoryProvider>

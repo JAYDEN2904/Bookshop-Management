@@ -17,34 +17,10 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import { User } from '../../types';
+import { useUser } from '../../contexts/UserContext';
 import toast from 'react-hot-toast';
 
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'John Admin',
-    email: 'admin@school.com',
-    role: 'admin',
-    createdAt: '2024-01-01',
-    lastActive: '2024-01-15T10:30:00'
-  },
-  {
-    id: '2',
-    name: 'Sarah Cashier',
-    email: 'cashier@school.com',
-    role: 'cashier',
-    createdAt: '2024-01-05',
-    lastActive: '2024-01-15T09:45:00'
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    email: 'mike@school.com',
-    role: 'cashier',
-    createdAt: '2024-01-10',
-    lastActive: '2024-01-14T16:20:00'
-  }
-];
+
 
 const mockActivityLogs = [
   { id: '1', userId: '2', userName: 'Sarah Cashier', action: 'Completed purchase for Rahul Kumar', timestamp: '2024-01-15T10:30:00', amount: '₵850' },
@@ -54,17 +30,25 @@ const mockActivityLogs = [
 ];
 
 const UserManagementPage: React.FC = () => {
+  const { users, isLoading, error, addUser, updateUser, deleteUser, resetUserPassword } = useUser();
   const [activeTab, setActiveTab] = useState<'users' | 'activity'>('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'cashier' as 'admin' | 'cashier',
+    role: 'CASHIER' as 'ADMIN' | 'CASHIER',
     tempPassword: ''
+  });
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    role: 'CASHIER' as 'ADMIN' | 'CASHIER'
   });
 
   const tabs = [
@@ -72,7 +56,7 @@ const UserManagementPage: React.FC = () => {
     { id: 'activity', label: 'Activity Logs', icon: Activity }
   ];
 
-  const filteredUsers = mockUsers.filter(user =>
+  const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -82,23 +66,73 @@ const UserManagementPage: React.FC = () => {
     setFormData({ ...formData, tempPassword: password });
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!formData.name || !formData.email || !formData.tempPassword) {
       toast.error('Please fill all required fields');
       return;
     }
     
-    toast.success('User added successfully');
-    setShowAddModal(false);
-    setFormData({ name: '', email: '', role: 'cashier', tempPassword: '' });
+    const success = await addUser(formData);
+    if (success) {
+      toast.success('User added successfully');
+      setShowAddModal(false);
+      setFormData({ name: '', email: '', role: 'CASHIER', tempPassword: '' });
+    } else {
+      toast.error(error || 'Failed to add user');
+    }
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!selectedUser) return;
     
-    toast.success(`Password reset for ${selectedUser.name}`);
-    setShowResetModal(false);
-    setSelectedUser(null);
+    const success = await resetUserPassword(selectedUser.id);
+    if (success) {
+      toast.success(`Password reset for ${selectedUser.name}`);
+      setShowResetModal(false);
+      setSelectedUser(null);
+    } else {
+      toast.error(error || 'Failed to reset password');
+    }
+  };
+
+  const handleEditUser = () => {
+    if (!selectedUser) return;
+    
+    setEditFormData({
+      name: selectedUser.name,
+      email: selectedUser.email,
+      role: selectedUser.role
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!selectedUser || !editFormData.name || !editFormData.email) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    
+    const success = await updateUser(selectedUser.id, editFormData);
+    if (success) {
+      toast.success('User updated successfully');
+      setShowEditModal(false);
+      setSelectedUser(null);
+    } else {
+      toast.error(error || 'Failed to update user');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    
+    const success = await deleteUser(selectedUser.id);
+    if (success) {
+      toast.success(`User ${selectedUser.name} deleted successfully`);
+      setShowDeleteModal(false);
+      setSelectedUser(null);
+    } else {
+      toast.error(error || 'Failed to delete user');
+    }
   };
 
   const formatLastActive = (timestamp: string) => {
@@ -134,7 +168,7 @@ const UserManagementPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{mockUsers.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
             </div>
           </div>
         </Card>
@@ -146,7 +180,7 @@ const UserManagementPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900">{mockUsers.filter(u => u.lastActive).length}</p>
+              <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.lastActive).length}</p>
             </div>
           </div>
         </Card>
@@ -250,7 +284,7 @@ const UserManagementPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            user.role === 'admin' 
+                            user.role === 'ADMIN' 
                               ? 'bg-red-100 text-red-800' 
                               : 'bg-blue-100 text-blue-800'
                           }`}>
@@ -275,13 +309,21 @@ const UserManagementPage: React.FC = () => {
                             <Key className="h-4 w-4" />
                           </button>
                           <button
+                            onClick={() => {
+                              setSelectedUser(user);
+                              handleEditUser();
+                            }}
                             className="text-gray-600 hover:text-gray-900"
                             title="Edit User"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
-                          {user.role !== 'admin' && (
+                          {user.role !== 'ADMIN' && (
                             <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowDeleteModal(true);
+                              }}
                               className="text-red-600 hover:text-red-900"
                               title="Delete User"
                             >
@@ -303,8 +345,8 @@ const UserManagementPage: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
                 <select className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="all">All Users</option>
-                  <option value="admin">Admin Only</option>
-                  <option value="cashier">Cashiers Only</option>
+                  <option value="ADMIN">Admin Only</option>
+                  <option value="CASHIER">Cashiers Only</option>
                 </select>
               </div>
 
@@ -366,8 +408,8 @@ const UserManagementPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="cashier">Cashier</option>
-              <option value="admin">Admin</option>
+                              <option value="CASHIER">Cashier</option>
+                              <option value="ADMIN">Admin</option>
             </select>
           </div>
 
@@ -440,6 +482,89 @@ const UserManagementPage: React.FC = () => {
               </Button>
               <Button variant="danger" onClick={handleResetPassword}>
                 Reset Password
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit User"
+        size="md"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Full Name *"
+            value={editFormData.name}
+            onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+            placeholder="Enter full name"
+          />
+
+          <Input
+            label="Email Address *"
+            type="email"
+            value={editFormData.email}
+            onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+            placeholder="Enter email address"
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select
+              value={editFormData.role}
+              onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value as any })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="CASHIER">Cashier</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateUser}>Update User</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete User Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete User"
+        size="sm"
+      >
+        {selectedUser && (
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">
+                <strong>Warning:</strong> This action cannot be undone. The user will be permanently deleted from the system.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <strong>User:</strong> {selectedUser.name}
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Email:</strong> {selectedUser.email}
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Role:</strong> {selectedUser.role}
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-4 pt-4">
+              <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteUser}>
+                Delete User
               </Button>
             </div>
           </div>

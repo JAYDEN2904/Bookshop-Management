@@ -59,7 +59,7 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600">Overview of your bookshop operations</p>
+        <p className="text-gray-600">Welcome back! Here's an overview of your bookshop operations</p>
       </div>
 
       {/* Sales Summary Cards */}

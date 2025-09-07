@@ -46,15 +46,15 @@ export const errorHandler = (
     error = { message, statusCode: 401 } as AppError;
   }
 
-  // Prisma errors
-  if (err.name === 'PrismaClientKnownRequestError') {
-    const prismaError = err as any;
-    if (prismaError.code === 'P2002') {
+  // Supabase/PostgreSQL errors
+  if (err.name === 'PostgresError') {
+    const postgresError = err as any;
+    if (postgresError.code === '23505') {
       const message = 'Duplicate field value entered';
       error = { message, statusCode: 400 } as AppError;
-    } else if (prismaError.code === 'P2025') {
-      const message = 'Record not found';
-      error = { message, statusCode: 404 } as AppError;
+    } else if (postgresError.code === '23503') {
+      const message = 'Invalid reference';
+      error = { message, statusCode: 400 } as AppError;
     }
   }
 

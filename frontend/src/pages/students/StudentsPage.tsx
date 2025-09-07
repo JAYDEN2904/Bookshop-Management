@@ -134,7 +134,7 @@ const StudentsPage: React.FC = () => {
     saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'students.xlsx');
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'ADMIN';
 
   // Handlers
   const handleAddStudent = async (e: React.FormEvent) => {

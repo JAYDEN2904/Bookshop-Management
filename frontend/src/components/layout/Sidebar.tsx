@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
     { path: '/receipts', label: 'Receipts', icon: Receipt },
   ];
 
-  const navItems = user?.role === 'admin' ? adminNavItems : cashierNavItems;
+  const navItems = user?.role === 'ADMIN' ? adminNavItems : cashierNavItems;
 
   return (
     <>
@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
             </button>
           </div>
           <div className="mt-4">
-            <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+            <p className="text-sm font-medium text-gray-900">Hello, {user?.name?.split(' ')[0]}</p>
             <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
           </div>
         </div>
