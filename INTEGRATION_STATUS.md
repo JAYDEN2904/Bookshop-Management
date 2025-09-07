@@ -121,3 +121,8 @@ The system is now fully integrated and ready for deployment. All major features 
 - **Admin**: `admin@bookshop.com` / `admin123`
 - **Cashier**: `cashier@bookshop.com` / `cashier123`
 
+
+
+
+
+
