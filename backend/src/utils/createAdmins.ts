@@ -11,6 +11,7 @@ async function createAdminUsers() {
     // Hash passwords
     const amaPassword = await bcrypt.hash('AmaOduro2024!', 12);
     const katePassword = await bcrypt.hash('KateOsafo2024!', 12);
+    const jaydenPassword = await bcrypt.hash('JaydenOsafo2024!', 12);
 
     // Helper to find auth user by email via admin API
     const findAuthUserByEmail = async (email: string) => {
@@ -107,10 +108,12 @@ async function createAdminUsers() {
 
     await ensureAdmin('Ama Oduro', 'ama.oduro@bookshop.com', 'AmaOduro2024!', amaPassword);
     await ensureAdmin('Kate Oduro Osafo', 'kate.osafo@bookshop.com', 'KateOsafo2024!', katePassword);
+    await ensureAdmin('Jayden Osafo', 'jayden.osafo@bookshop.com', 'JaydenOsafo2024!', jaydenPassword);
 
     console.log('\n📋 Admin Credentials:');
     console.log('Admin (Ama): ama.oduro@bookshop.com / AmaOduro2024!');
     console.log('Admin (Kate): kate.osafo@bookshop.com / KateOsafo2024!');
+    console.log('Admin (Jayden): jayden.osafo@bookshop.com / JaydenOsafo2024!');
     console.log('\n🎉 Admin users created successfully!');
 
   } catch (error) {

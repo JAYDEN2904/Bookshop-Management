@@ -25,3 +25,8 @@ export const supabasePublic = createClient(
 );
 
 export default supabase;
+
+
+
+
+
