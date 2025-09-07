@@ -1,10 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { supabase } from '../config/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Validate environment variables
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Missing required Supabase environment variables. Please check your .env file.');
+}
+
+// Create Supabase client for auth operations
+const supabaseAuth = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+// Create Supabase client for database operations (with service role)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export interface AuthRequest extends Request {
   user?: {
     id: string;
+    auth_user_id: string;
     name: string;
     email: string;
     role: string;
@@ -15,36 +32,41 @@ export interface AuthRequest extends Request {
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  let token;
-
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(' ')[1];
-
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-
-      // Get user from token
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('id, name, email, role, created_at, updated_at')
-        .eq('id', decoded.id)
-        .single();
-
-      if (!user || error) {
-        return res.status(401).json({ success: false, error: 'User not found' });
-      }
-
-      req.user = user;
-      return next();
-    } catch (error) {
-      return res.status(401).json({ success: false, error: 'Not authorized' });
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ success: false, error: 'No token provided' });
     }
-  }
 
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Not authorized, no token' });
+    // Verify token with Supabase Auth
+    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+    
+    if (authError || !authUser) {
+      return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+
+    // Get user profile from public.users table
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_user_id', authUser.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return res.status(401).json({ success: false, error: 'User profile not found' });
+    }
+
+    // Attach user to request
+    req.user = {
+      ...userProfile,
+      auth_user_id: authUser.id
+    };
+    
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return res.status(401).json({ success: false, error: 'Authentication failed' });
   }
 };
 
