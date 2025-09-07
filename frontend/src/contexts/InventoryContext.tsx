@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Book, StockHistory } from '../types';
 import { useAuth } from './AuthContext';
+import { apiConfig } from '../config/api';
 
 interface InventoryContextType {
   books: Book[];
@@ -929,65 +930,184 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  };
+
+  // Helper function to map backend book to frontend book
+  const mapBackendBookToFrontend = (backendBook: any): Book => {
+    return {
+      id: backendBook.id,
+      author: backendBook.title || 'Unknown Author', // Backend uses title, frontend expects author
+      class: backendBook.class_level,
+      subject: backendBook.subject,
+      type: 'textbook' as const, // Default type since backend doesn't have this field
+      sellingPrice: backendBook.price,
+      costPrice: backendBook.price * 0.7, // Estimate cost price as 70% of selling price
+      stock: backendBook.stock_quantity,
+      minStock: 5, // Default minimum stock
+      supplier: 'Unknown Supplier', // Default since backend doesn't have this field
+      description: '',
+      createdAt: backendBook.created_at,
+      updatedAt: backendBook.updated_at
+    };
+  };
+
+  // Helper function to map frontend book to backend book
+  const mapFrontendBookToBackend = (frontendBook: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>) => {
+    return {
+      title: frontendBook.author, // Frontend author maps to backend title
+      class_level: frontendBook.class,
+      subject: frontendBook.subject,
+      price: frontendBook.sellingPrice,
+      stock_quantity: frontendBook.stock
+    };
+  };
+
   useEffect(() => {
-    // Load mock data
-    setBooks(mockBooks);
-    setStockHistory(mockStockHistory);
-    setIsLoading(false);
+    loadBooks();
   }, []);
+
+  const loadBooks = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.books}`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load books');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        const mappedBooks = data.data.map(mapBackendBookToFrontend);
+        setBooks(mappedBooks);
+      } else {
+        throw new Error(data.error || 'Failed to load books');
+      }
+    } catch (err) {
+      console.error('Error loading books:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load books');
+      // Fallback to mock data if API fails
+      setBooks(mockBooks);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const addBook = async (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
     try {
-      const newBook: Book = {
-        ...bookData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+      const backendBookData = mapFrontendBookToBackend(bookData);
       
-      setBooks(prev => [...prev, newBook]);
-      
-      // Add initial stock history entry
-      const initialHistory: StockHistory = {
-        id: Date.now().toString(),
-        bookId: newBook.id,
-        type: 'addition',
-        quantity: newBook.stock,
-        previousStock: 0,
-        newStock: newBook.stock,
-        reference: 'Initial stock',
-        note: 'Book added to inventory',
-        userId: user?.id || '',
-        userName: user?.name || '',
-        createdAt: new Date().toISOString()
-      };
-      
-      setStockHistory(prev => [...prev, initialHistory]);
+      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.books}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(backendBookData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add book');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        const newBook = mapBackendBookToFrontend(data.data);
+        setBooks(prev => [...prev, newBook]);
+        
+        // Add initial stock history entry
+        const initialHistory: StockHistory = {
+          id: Date.now().toString(),
+          bookId: newBook.id,
+          type: 'addition',
+          quantity: newBook.stock,
+          previousStock: 0,
+          newStock: newBook.stock,
+          reference: 'Initial stock',
+          note: 'Book added to inventory',
+          userId: user?.id || '',
+          userName: user?.name || '',
+          createdAt: new Date().toISOString()
+        };
+        
+        setStockHistory(prev => [...prev, initialHistory]);
+      } else {
+        throw new Error(data.error || 'Failed to add book');
+      }
     } catch (err) {
-      setError('Failed to add book');
+      console.error('Error adding book:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add book');
       throw err;
     }
   };
 
   const updateBook = async (id: string, updates: Partial<Book>): Promise<void> => {
     try {
-      setBooks(prev => prev.map(book => 
-        book.id === id 
-          ? { ...book, ...updates, updatedAt: new Date().toISOString() }
-          : book
-      ));
+      const currentBook = books.find(book => book.id === id);
+      if (!currentBook) {
+        throw new Error('Book not found');
+      }
+
+      const updatedBookData = { ...currentBook, ...updates };
+      const backendBookData = mapFrontendBookToBackend(updatedBookData);
+      
+      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.books}/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(backendBookData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update book');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        const updatedBook = mapBackendBookToFrontend(data.data);
+        setBooks(prev => prev.map(book => 
+          book.id === id ? updatedBook : book
+        ));
+      } else {
+        throw new Error(data.error || 'Failed to update book');
+      }
     } catch (err) {
-      setError('Failed to update book');
+      console.error('Error updating book:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update book');
       throw err;
     }
   };
 
   const deleteBook = async (id: string): Promise<void> => {
     try {
-      setBooks(prev => prev.filter(book => book.id !== id));
-      setStockHistory(prev => prev.filter(history => history.bookId !== id));
+      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.books}/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete book');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setBooks(prev => prev.filter(book => book.id !== id));
+        setStockHistory(prev => prev.filter(history => history.bookId !== id));
+      } else {
+        throw new Error(data.error || 'Failed to delete book');
+      }
     } catch (err) {
-      setError('Failed to delete book');
+      console.error('Error deleting book:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete book');
       throw err;
     }
   };
