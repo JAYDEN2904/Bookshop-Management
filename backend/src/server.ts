@@ -1,8 +1,11 @@
+// Load environment variables FIRST
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import path from 'path';
 
 // Import routes
@@ -18,9 +21,6 @@ import storageRoutes from './routes/storage';
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
