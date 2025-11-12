@@ -11,6 +11,7 @@ router.get('/', protect, async (req: any, res) => {
   try {
     const { search, student_id, book_id, start_date, end_date, page = 1, limit = 10 } = req.query;
 
+    // Build select query - try to include cashier if column exists
     let query = supabase
       .from('purchases')
       .select(`
@@ -113,9 +114,10 @@ router.get('/:id', protect, async (req, res) => {
 // @desc    Create purchase
 // @route   POST /api/purchases
 // @access  Private
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, async (req: any, res) => {
   try {
-    const { student_id, book_id, quantity, unit_price } = req.body;
+    const { student_id, book_id, quantity, unit_price, receipt_number } = req.body;
+    const cashier_id = req.user?.id; // Get cashier from authenticated user
 
     // Validate required fields
     if (!student_id || !book_id || !quantity || !unit_price) {
@@ -146,30 +148,43 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
-    // Generate receipt number
-    const { data: receiptNumber, error: receiptError } = await supabase.rpc('generate_receipt_number');
-    
-    if (receiptError) {
-      console.error('Generate receipt number error:', receiptError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to generate receipt number'
-      });
+    // Use provided receipt number or generate a new one
+    let receiptNumber = receipt_number;
+    if (!receiptNumber) {
+      const { data: generatedReceiptNumber, error: receiptError } = await supabase.rpc('generate_receipt_number');
+      
+      if (receiptError) {
+        console.error('Generate receipt number error:', receiptError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to generate receipt number'
+        });
+      }
+      
+      receiptNumber = generatedReceiptNumber;
     }
 
     const total_amount = quantity * unit_price;
 
     // Create purchase
-    const { data: purchase, error } = await supabase
+    const purchaseData: any = {
+      student_id,
+      book_id,
+      quantity,
+      unit_price,
+      total_amount,
+      receipt_number: receiptNumber
+    };
+    
+    // Add cashier_id if available (will be ignored if column doesn't exist)
+    // Run backend/scripts/add-cashier-to-purchases.sql to add this column
+    if (cashier_id) {
+      purchaseData.cashier_id = cashier_id;
+    }
+    
+    const { data: purchase, error: purchaseError } = await supabase
       .from('purchases')
-      .insert([{
-        student_id,
-        book_id,
-        quantity,
-        unit_price,
-        total_amount,
-        receipt_number: receiptNumber
-      }])
+      .insert([purchaseData])
       .select(`
         *,
         students (id, name, student_id, class_level),
@@ -177,32 +192,31 @@ router.post('/', protect, async (req, res) => {
       `)
       .single();
 
-    if (error) {
-      console.error('Create purchase error:', error);
+    if (purchaseError) {
+      console.error('Create purchase error:', purchaseError);
       return res.status(500).json({
         success: false,
-        error: 'Database error'
+        error: purchaseError.message || 'Failed to create purchase'
       });
     }
 
-    // Update book stock
-    await supabase
-      .from('books')
-      .update({
-        stock_quantity: book.stock_quantity - quantity,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', book_id);
+    // Update book stock using RPC function (handles stock update and history logging)
+    const { error: stockError } = await supabase.rpc('update_book_stock', {
+      book_uuid: book_id,
+      quantity_change: -quantity, // Negative because we're reducing stock
+      change_reason: `Purchase: ${receiptNumber || 'N/A'}`
+    });
 
-    // Log stock change
-    await supabase
-      .from('stock_history')
-      .insert([{
-        book_id,
-        change_quantity: -quantity,
-        change_type: 'OUT',
-        reason: `Purchase: ${receiptNumber}`
-      }]);
+    if (stockError) {
+      console.error('Update stock error:', stockError);
+      // Try to delete the purchase if stock update failed
+      await supabase.from('purchases').delete().eq('id', purchase.id);
+      
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update inventory. Purchase was not completed.'
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -266,20 +280,77 @@ router.put('/:id', protect, authorize('ADMIN'), async (req, res) => {
       });
     }
 
-    // Update book stock if quantity changed
-    if (quantity !== currentPurchase.quantity) {
-      const quantityDifference = currentPurchase.quantity - quantity;
-      
-      await supabase
-        .from('books')
-        .update({
-          stock_quantity: supabase.rpc('update_book_stock', {
-            book_uuid: book_id,
-            quantity_change: quantityDifference,
-            change_reason: `Purchase update: ${currentPurchase.receipt_number}`
-          })
-        })
-        .eq('id', book_id);
+    // Update book stock if quantity or book changed
+    const bookChanged = book_id !== currentPurchase.book_id;
+    const quantityChanged = quantity !== currentPurchase.quantity;
+    
+    if (bookChanged || quantityChanged) {
+      // If book changed, restore stock for old book and reduce stock for new book
+      if (bookChanged && currentPurchase.book_id) {
+        // Restore stock for old book
+        const { error: restoreError } = await supabase.rpc('update_book_stock', {
+          book_uuid: currentPurchase.book_id,
+          quantity_change: currentPurchase.quantity,
+          change_reason: `Purchase update: Restored from ${currentPurchase.receipt_number}`
+        });
+        
+        if (restoreError) {
+          console.error('Restore stock error:', restoreError);
+        }
+        
+        // Check if new book has enough stock
+        const { data: newBook, error: newBookError } = await supabase
+          .from('books')
+          .select('stock_quantity')
+          .eq('id', book_id)
+          .single();
+          
+        if (newBookError || !newBook) {
+          return res.status(404).json({
+            success: false,
+            error: 'New book not found'
+          });
+        }
+        
+        if (newBook.stock_quantity < quantity) {
+          return res.status(400).json({
+            success: false,
+            error: 'Insufficient stock for new book'
+          });
+        }
+        
+        // Reduce stock for new book
+        const { error: reduceError } = await supabase.rpc('update_book_stock', {
+          book_uuid: book_id,
+          quantity_change: -quantity,
+          change_reason: `Purchase update: ${currentPurchase.receipt_number}`
+        });
+        
+        if (reduceError) {
+          console.error('Reduce stock error:', reduceError);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to update inventory'
+          });
+        }
+      } else if (quantityChanged) {
+        // Only quantity changed, adjust stock difference
+        const quantityDifference = currentPurchase.quantity - quantity;
+        
+        const { error: stockError } = await supabase.rpc('update_book_stock', {
+          book_uuid: book_id || currentPurchase.book_id,
+          quantity_change: quantityDifference, // Positive if reducing purchase, negative if increasing
+          change_reason: `Purchase update: ${currentPurchase.receipt_number}`
+        });
+        
+        if (stockError) {
+          console.error('Update stock error:', stockError);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to update inventory'
+          });
+        }
+      }
     }
 
     return res.json({
@@ -314,31 +385,36 @@ router.delete('/:id', protect, authorize('ADMIN'), async (req, res) => {
       });
     }
 
+    // Restore book stock first (before deleting purchase)
+    if (purchase.book_id) {
+      const { error: stockError } = await supabase.rpc('update_book_stock', {
+        book_uuid: purchase.book_id,
+        quantity_change: purchase.quantity, // Positive to restore stock
+        change_reason: `Purchase cancelled: ${purchase.receipt_number || 'N/A'}`
+      });
+
+      if (stockError) {
+        console.error('Restore stock error:', stockError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to restore inventory. Purchase was not deleted.'
+        });
+      }
+    }
+
     // Delete purchase
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('purchases')
       .delete()
       .eq('id', req.params.id);
 
-    if (error) {
-      console.error('Delete purchase error:', error);
+    if (deleteError) {
+      console.error('Delete purchase error:', deleteError);
       return res.status(500).json({
         success: false,
-        error: 'Database error'
+        error: deleteError.message || 'Failed to delete purchase'
       });
     }
-
-    // Restore book stock
-    await supabase
-      .from('books')
-      .update({
-        stock_quantity: supabase.rpc('update_book_stock', {
-          book_uuid: purchase.book_id,
-          quantity_change: purchase.quantity,
-          change_reason: `Purchase cancelled: ${purchase.receipt_number}`
-        })
-      })
-      .eq('id', purchase.book_id);
 
     return res.json({
       success: true,

@@ -21,8 +21,13 @@ CREATE TABLE books (
   title VARCHAR(255) NOT NULL,
   class_level VARCHAR(20) NOT NULL,
   subject VARCHAR(50) NOT NULL,
+  type VARCHAR(20) NOT NULL DEFAULT 'textbook',
   price DECIMAL(10,2) NOT NULL,
+  cost_price DECIMAL(10,2) NOT NULL DEFAULT 0,
   stock_quantity INTEGER NOT NULL DEFAULT 0,
+  min_stock INTEGER NOT NULL DEFAULT 0,
+  supplier_name VARCHAR(255),
+  description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

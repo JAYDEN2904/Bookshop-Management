@@ -142,33 +142,74 @@ router.get('/:id', protect, async (req, res) => {
 // @access  Private (Admin only)
 router.post('/', protect, authorize('ADMIN'), async (req, res) => {
   try {
-    const { title, class_level, subject, price, stock_quantity } = req.body;
+    const {
+      title,
+      class_level,
+      subject,
+      type,
+      price,
+      cost_price,
+      stock_quantity,
+      min_stock,
+      supplier_name,
+      description
+    } = req.body;
 
     // Validate required fields
-    if (!title || !class_level || !subject || !price) {
+    if (!title || !class_level || !subject || price === undefined || price === null) {
       return res.status(400).json({
         success: false,
         error: 'Please provide title, class_level, subject, and price'
       });
     }
 
+    const insertPayload: Record<string, any> = {
+      title,
+      class_level,
+      subject,
+      type: type || 'textbook',
+      price: Number(price),
+      stock_quantity: stock_quantity !== undefined ? Number(stock_quantity) : 0,
+      min_stock: min_stock !== undefined ? Number(min_stock) : 0,
+    };
+
+    // Include cost_price if provided (0 is a valid value, so check for undefined/null)
+    // If not provided, the database will use the default value (0) from the schema
+    if (cost_price !== undefined && cost_price !== null && cost_price !== '') {
+      insertPayload.cost_price = Number(cost_price);
+    } else {
+      // Explicitly set to 0 if not provided to use database default
+      insertPayload.cost_price = 0;
+    }
+
+    // Optional fields
+    if (supplier_name) {
+      insertPayload.supplier_name = supplier_name;
+    }
+    if (description) {
+      insertPayload.description = description;
+    }
+
     const { data: book, error } = await supabase
       .from('books')
-      .insert([{
-        title,
-        class_level,
-        subject,
-        price: Number(price),
-        stock_quantity: stock_quantity || 0
-      }])
+      .insert([insertPayload])
       .select()
       .single();
 
     if (error) {
       console.error('Create book error:', error);
-      return res.status(500).json({
+      
+      // Provide helpful error message for missing column
+      if (error.message?.includes("Could not find the 'cost_price' column")) {
+        return res.status(400).json({
+          success: false,
+          error: 'Database schema error: cost_price column is missing. Please run the migration script: backend/scripts/add-book-metadata-columns.sql in your Supabase SQL Editor.'
+        });
+      }
+      
+      return res.status(400).json({
         success: false,
-        error: 'Database error'
+        error: error.message || 'Failed to create book'
       });
     }
 
@@ -190,26 +231,46 @@ router.post('/', protect, authorize('ADMIN'), async (req, res) => {
 // @access  Private (Admin only)
 router.put('/:id', protect, authorize('ADMIN'), async (req, res) => {
   try {
-    const { title, class_level, subject, price, stock_quantity } = req.body;
+    const {
+      title,
+      class_level,
+      subject,
+      type,
+      price,
+      cost_price,
+      stock_quantity,
+      min_stock,
+      supplier_name,
+      description
+    } = req.body;
+
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (title !== undefined) updates.title = title;
+    if (class_level !== undefined) updates.class_level = class_level;
+    if (subject !== undefined) updates.subject = subject;
+    if (type !== undefined) updates.type = type || 'textbook';
+    if (price !== undefined) updates.price = Number(price);
+    if (cost_price !== undefined) updates.cost_price = Number(cost_price);
+    if (stock_quantity !== undefined) updates.stock_quantity = Number(stock_quantity);
+    if (min_stock !== undefined) updates.min_stock = Number(min_stock);
+    if (supplier_name !== undefined) updates.supplier_name = supplier_name || null;
+    if (description !== undefined) updates.description = description || null;
 
     const { data: book, error } = await supabase
       .from('books')
-      .update({
-        title,
-        class_level,
-        subject,
-        price: Number(price),
-        stock_quantity: Number(stock_quantity),
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .single();
 
     if (error || !book) {
-      return res.status(404).json({
+      console.error('Update book error:', error);
+      return res.status(error?.message?.includes('not found') ? 404 : 400).json({
         success: false,
-        error: 'Book not found'
+        error: error?.message || 'Failed to update book'
       });
     }
 
