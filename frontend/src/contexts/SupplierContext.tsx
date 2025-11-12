@@ -153,16 +153,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-<<<<<<< Updated upstream
-  // Supplier CRUD operations
-  const addSupplier = async (supplier: Omit<Supplier, 'id' | 'createdAt'>) => {
-    try {
-      setIsLoading(true);
-      const newSupplier: Supplier = {
-        ...supplier,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString()
-=======
   // Load suppliers from Supabase
   const loadSuppliers = async (): Promise<Supplier[]> => {
     try {
@@ -368,24 +358,20 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         address: newSupplier.address || '',
         balance: newSupplier.balance || 0, // Default to 0 if balance doesn't exist
         createdAt: newSupplier.created_at
->>>>>>> Stashed changes
       };
-      setSuppliers(prev => [...prev, newSupplier]);
+      setSuppliers(prev => [...prev, mappedSupplier]);
       toast.success('Supplier added successfully');
-    } catch (err) {
-      setError('Failed to add supplier');
-      toast.error('Failed to add supplier');
-    } finally {
-      setIsLoading(false);
+    } catch (error: any) {
+      console.error('Failed to add supplier:', error);
+      const errorMessage = error.message || 'Failed to add supplier';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw error;
     }
   };
 
   const editSupplier = async (id: string, updates: Partial<Supplier>) => {
     try {
-<<<<<<< Updated upstream
-      setIsLoading(true);
-      setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-=======
       setError(null);
       const normalizedUpdates: any = {};
       
@@ -426,26 +412,40 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setSuppliers(prev => prev.map(s => 
         s.id === id ? mappedSupplier : s
       ));
->>>>>>> Stashed changes
       toast.success('Supplier updated successfully');
-    } catch (err) {
-      setError('Failed to update supplier');
-      toast.error('Failed to update supplier');
-    } finally {
-      setIsLoading(false);
+    } catch (error: any) {
+      console.error('Failed to update supplier:', error);
+      const errorMessage = error.message || 'Failed to update supplier';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw error;
     }
   };
 
   const deleteSupplier = async (id: string) => {
     try {
-      setIsLoading(true);
+      setError(null);
+      const { error: deleteError } = await supabase
+        .from('suppliers')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting supplier:', deleteError);
+        const errorMessage = deleteError.message || 'Failed to delete supplier';
+        setError(errorMessage);
+        toast.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+
       setSuppliers(prev => prev.filter(s => s.id !== id));
       toast.success('Supplier deleted successfully');
-    } catch (err) {
-      setError('Failed to delete supplier');
-      toast.error('Failed to delete supplier');
-    } finally {
-      setIsLoading(false);
+    } catch (error: any) {
+      console.error('Failed to delete supplier:', error);
+      const errorMessage = error.message || 'Failed to delete supplier';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      throw error;
     }
   };
 
@@ -456,29 +456,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Supply Order operations
   const addSupplyOrder = async (order: Omit<SupplyOrder, 'id' | 'createdAt'>) => {
     try {
-<<<<<<< Updated upstream
-      setIsLoading(true);
-      const newOrder: SupplyOrder = {
-        ...order,
-        id: `SO${Date.now()}`,
-        createdAt: new Date().toISOString()
-      };
-      setSupplyOrders(prev => [...prev, newOrder]);
-      
-      // Update supplier balance
-      const supplier = getSupplierById(order.supplierId);
-      if (supplier) {
-        const newBalance = supplier.balance + order.totalAmount;
-        editSupplier(order.supplierId, { balance: newBalance });
-      }
-      
-      toast.success('Supply order created successfully');
-    } catch (err) {
-      setError('Failed to create supply order');
-      toast.error('Failed to create supply order');
-    } finally {
-      setIsLoading(false);
-=======
       setError(null);
       
       // Check if required fields are present
@@ -554,22 +531,11 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setError(errorMessage);
       toast.error(errorMessage);
       throw error;
->>>>>>> Stashed changes
     }
   };
 
   const updateSupplyOrderStatus = async (id: string, status: SupplyOrder['status']) => {
     try {
-<<<<<<< Updated upstream
-      setIsLoading(true);
-      setSupplyOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-      toast.success('Order status updated successfully');
-    } catch (err) {
-      setError('Failed to update order status');
-      toast.error('Failed to update order status');
-    } finally {
-      setIsLoading(false);
-=======
       setError(null);
       
       const { error: updateError } = await supabase
@@ -590,7 +556,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setError(error.message || 'Failed to update supply order status');
       toast.error(error.message || 'Failed to update supply order status');
       throw error;
->>>>>>> Stashed changes
     }
   };
 
@@ -601,29 +566,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Payment operations
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'createdAt'>) => {
     try {
-<<<<<<< Updated upstream
-      setIsLoading(true);
-      const newPayment: SupplierPayment = {
-        ...payment,
-        id: `PAY${Date.now()}`,
-        createdAt: new Date().toISOString()
-      };
-      setSupplierPayments(prev => [...prev, newPayment]);
-      
-      // Update supplier balance
-      const supplier = getSupplierById(payment.supplierId);
-      if (supplier) {
-        const newBalance = supplier.balance - payment.amount;
-        editSupplier(payment.supplierId, { balance: newBalance });
-      }
-      
-      toast.success('Payment recorded successfully');
-    } catch (err) {
-      setError('Failed to record payment');
-      toast.error('Failed to record payment');
-    } finally {
-      setIsLoading(false);
-=======
       setError(null);
       
       // Validate required fields
@@ -668,7 +610,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setError(errorMessage);
       toast.error(errorMessage);
       throw error;
->>>>>>> Stashed changes
     }
   };
 
@@ -720,43 +661,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Analytics operations
   const getSupplierAnalytics = (supplierId: string): SupplierAnalytics => {
-<<<<<<< Updated upstream
-    const orders = getSupplyOrdersBySupplier(supplierId);
-    const payments = getPaymentsBySupplier(supplierId);
-    const supplier = getSupplierById(supplierId);
-    
-    const totalSupplies = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstandingBalance = supplier?.balance || 0;
-    const averageOrderValue = orders.length > 0 ? totalSupplies / orders.length : 0;
-    
-    // Calculate on-time delivery rate (mock data)
-    const onTimeDeliveryRate = orders.length > 0 ? 85 : 0;
-    
-    // Calculate reliability score based on various factors
-    const reliabilityScore = Math.min(100, Math.max(0, 
-      (onTimeDeliveryRate * 0.4) + 
-      (orders.length > 0 ? 20 : 0) + 
-      (outstandingBalance < 0 ? 40 : 0)
-    ));
-
-    const lastOrderDate = orders.length > 0 
-      ? orders.sort((a, b) => new Date(b.supplyDate).getTime() - new Date(a.supplyDate).getTime())[0].supplyDate
-      : '';
-
-    return {
-      totalSupplies,
-      totalPayments,
-      outstandingBalance,
-      averageOrderValue,
-      onTimeDeliveryRate,
-      reliabilityScore,
-      lastOrderDate,
-      paymentHistory: {
-        onTime: Math.floor(payments.length * 0.7),
-        late: Math.floor(payments.length * 0.2),
-        overdue: Math.floor(payments.length * 0.1)
-=======
     // Get supplier's orders and payments
     const supplierOrders = supplyOrders.filter(order => order.supplierId === supplierId);
     const supplierPaymentsList = supplierPayments.filter(payment => payment.supplierId === supplierId);
@@ -838,7 +742,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           // No payment found and past due date
           paymentHistory.overdue++;
         }
->>>>>>> Stashed changes
       }
     });
 
@@ -882,12 +785,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const getOverduePayments = (): SupplyOrder[] => {
     const today = new Date();
-<<<<<<< Updated upstream
-    return supplyOrders.filter(order => {
-      if (!order.expectedPaymentDate || order.status !== 'received') return false;
-      const dueDate = new Date(order.expectedPaymentDate);
-      return dueDate < today;
-=======
     today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
     
     return supplyOrders.filter(order => {
@@ -904,7 +801,6 @@ export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       expectedDate.setHours(0, 0, 0, 0);
       
       return expectedDate < today;
->>>>>>> Stashed changes
     });
   };
 
