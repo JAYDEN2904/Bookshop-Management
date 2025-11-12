@@ -79,8 +79,11 @@ const InventoryPage: React.FC = () => {
   ];
 
   const filteredBooks = books.filter(book => {
-    const matchesSearch = book.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         book.author.toLowerCase().includes(searchTerm.toLowerCase());
+    const authorSearchable = (book.author || '').toLowerCase();
+    const subjectSearchable = (book.subject || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = subjectSearchable.includes(term) ||
+                         authorSearchable.includes(term);
     const matchesClass = !selectedClass || book.class === selectedClass;
     return matchesSearch && matchesClass;
   });
@@ -90,8 +93,9 @@ const InventoryPage: React.FC = () => {
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const authorValue = bookForm.author.trim() || bookForm.subject.trim() || 'Unknown';
       await addBook({
-        author: bookForm.author,
+        author: authorValue,
         class: bookForm.class,
         subject: bookForm.subject,
         type: bookForm.type,
@@ -345,7 +349,7 @@ const InventoryPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{book.subject}</div>
-                            <div className="text-sm text-gray-500">by {book.author}</div>
+                          <div className="text-sm text-gray-500">by {book.author || 'Unknown Author'}</div>
                             <div className="text-xs text-gray-400 capitalize">{book.type}</div>
                           </div>
                         </td>
@@ -499,14 +503,7 @@ const InventoryPage: React.FC = () => {
         size="lg"
       >
         <form onSubmit={handleAddBook} className="space-y-4">
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input 
-              label="Author" 
-              placeholder="Enter author name"
-              value={bookForm.author}
-              onChange={(e) => setBookForm({...bookForm, author: e.target.value})}
-              required
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <select 
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={bookForm.class}

@@ -7,6 +7,8 @@ import { User, Package, Trash2, Plus, ShoppingCart, Download, History } from 'lu
 import { QRCodeCanvas } from 'qrcode.react';
 import { useStudentContext } from '../../contexts/StudentContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useInventory } from '../../contexts/InventoryContext';
+import { api } from '../../config/api';
 
 // Mock data for classes
 const classes = ['Basic 1', 'Basic 2', 'Basic 3', 'Basic 4', 'Basic 5', 'Basic 6', 'Basic 7', 'Basic 8', 'Basic 9'];
@@ -165,6 +167,7 @@ const initialBundles = {
 const StudentPurchasePage: React.FC = () => {
   const { user } = useAuth();
   const { students } = useStudentContext();
+  const { books, refreshBooks } = useInventory();
   
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState('');
@@ -189,6 +192,10 @@ const StudentPurchasePage: React.FC = () => {
 
   // Cart state
   const [cart, setCart] = useState<{ bookId: string; title: string; price: number; quantity: number; stock: number }[]>([]);
+  
+  // Purchase state
+  const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   // Discount state
   const [discountType, setDiscountType] = useState<'percent' | 'flat'>('percent');
@@ -283,54 +290,116 @@ const StudentPurchasePage: React.FC = () => {
         (student.studentId && student.studentId.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
-  // Filter books for inventory modal
-  const filteredBooks = mockBooks.filter(
+  // Filter books for inventory modal - use real books from inventory
+  const filteredBooks = books.filter(
     (book) =>
       (!selectedStudent || book.class === selectedStudent.class) &&
-      (book.title.toLowerCase().includes(bookSearch.toLowerCase()))
-  );
+      (book.subject.toLowerCase().includes(bookSearch.toLowerCase()) ||
+       book.class.toLowerCase().includes(bookSearch.toLowerCase()))
+  ).map(book => ({
+    id: book.id,
+    title: book.subject,
+    class: book.class,
+    stock: book.stock,
+    price: book.sellingPrice,
+  }));
 
   // Add book to cart
-  const handleAddBookToCart = (book: typeof mockBooks[0], quantity: number) => {
-    if (book.stock < quantity) return;
+  const handleAddBookToCart = (book: { id: string; title: string; price: number; stock: number }, quantity: number) => {
+    if (book.stock < quantity) {
+      setPurchaseError(`Insufficient stock. Only ${book.stock} available.`);
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.bookId === book.id);
       if (existing) {
-        return prev.map((item) =>
-          item.bookId === book.id
-            ? { ...item, quantity: Math.min(item.quantity + quantity, book.stock) }
-            : item
-      );
-    } else {
+        const newQuantity = Math.min(existing.quantity + quantity, book.stock);
+        if (newQuantity > existing.quantity) {
+          return prev.map((item) =>
+            item.bookId === book.id
+              ? { ...item, quantity: newQuantity, stock: book.stock }
+              : item
+          );
+        }
+        return prev;
+      } else {
         return [
           ...prev,
           { bookId: book.id, title: book.title, price: book.price, quantity: Math.min(quantity, book.stock), stock: book.stock },
         ];
-    }
+      }
     });
     setShowBookModal(false);
     setBookQty(1);
+    setPurchaseError(null);
   };
 
-  // Add bundle to cart
+  // Add bundle to cart - dynamically create bundle from real books
   const handleAddBundleToCart = () => {
-    if (!selectedStudent) return;
-    const bundle = bundles[selectedStudent.class] || [];
+    if (!selectedStudent) {
+      setPurchaseError('Please select a student first');
+      return;
+    }
+
+    // Standard subjects for each class bundle
+    const standardSubjects = ['Mathematics', 'English Grammar', 'Science', 'Social Studies', 'French', 'ICT'];
+    
+    // Find all books for this student's class
+    const classBooks = books.filter(book => book.class === selectedStudent.class);
+    
+    if (classBooks.length === 0) {
+      setPurchaseError(`No books found for class ${selectedStudent.class}`);
+      return;
+    }
+
     setCart((prev) => {
       let updated = [...prev];
-      bundle.forEach((b) => {
-        const book = mockBooks.find((bk) => bk.id === b.bookId);
-        if (!book) return;
-        const existing = updated.find((item) => item.bookId === book.id);
-        const addQty = Math.min(b.quantity, book.stock - (existing ? existing.quantity : 0));
-        if (addQty > 0) {
-          if (existing) {
-            existing.quantity += addQty;
-          } else {
-            updated.push({ bookId: book.id, title: book.title, price: book.price, quantity: addQty, stock: book.stock });
+      let addedAny = false;
+      
+      // Try to add each standard subject book
+      standardSubjects.forEach(subject => {
+        // Find the book for this class and subject
+        const book = classBooks.find(b => 
+          b.subject.toLowerCase().includes(subject.toLowerCase()) ||
+          subject.toLowerCase().includes(b.subject.toLowerCase())
+        );
+        
+        if (book && book.stock > 0) {
+          const existing = updated.find((item) => item.bookId === book.id);
+          const availableStock = book.stock - (existing ? existing.quantity : 0);
+          const addQty = Math.min(1, availableStock); // Add 1 of each book
+          
+          if (addQty > 0) {
+            addedAny = true;
+            if (existing) {
+              // Increase quantity if already in cart, but don't exceed stock
+              const newQuantity = Math.min(existing.quantity + addQty, book.stock);
+              if (newQuantity > existing.quantity) {
+                existing.quantity = newQuantity;
+                existing.stock = book.stock;
+              }
+            } else {
+              updated.push({ 
+                bookId: book.id, 
+                title: book.subject, 
+                price: book.sellingPrice, 
+                quantity: addQty, 
+                stock: book.stock 
+              });
+            }
           }
         }
       });
+      
+      if (!addedAny) {
+        // Show error if no books could be added
+        setTimeout(() => {
+          setPurchaseError(`No books available for ${selectedStudent.class} bundle. Some books may be out of stock.`);
+        }, 100);
+      } else {
+        setPurchaseError(null);
+      }
+      
       return updated;
     });
   };
@@ -411,24 +480,146 @@ const StudentPurchasePage: React.FC = () => {
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   // Handle complete purchase
-  const handleCompletePurchase = () => {
-    // Generate unique receipt ID
-    const receiptId = `RCPT${receiptIdRef.current++}`;
-    const receipt = {
-      id: receiptId,
-      date: new Date().toLocaleString(),
-      student: selectedStudent,
-      items: cart,
-      subtotal,
-      discountType,
-      discountValue,
-      discountAmount,
-      total,
-      payments,
-    };
-    setLastReceipt(receipt);
-    setShowReceiptModal(true);
-    // Optionally: clear cart/payments/discounts here
+  const handleCompletePurchase = async () => {
+    if (!selectedStudent) {
+      setPurchaseError('Please select a student');
+      return;
+    }
+
+    if (cart.length === 0) {
+      setPurchaseError('Cart is empty');
+      return;
+    }
+
+    if (!isPaymentValid) {
+      setPurchaseError('Payment amount must match total');
+      return;
+    }
+
+    setIsProcessingPurchase(true);
+    setPurchaseError(null);
+
+    try {
+      console.log('Starting purchase process...', { student: selectedStudent.id, cartItems: cart.length });
+      
+      // Generate a single receipt number for this transaction
+      // We'll get it from the first purchase response and reuse it for all subsequent purchases
+      let sharedReceiptNumber: string | null = null;
+      const purchases = [];
+      const errors = [];
+
+      for (let i = 0; i < cart.length; i++) {
+        const item = cart[i];
+        try {
+          console.log('Creating purchase for item:', item);
+          
+          const purchaseData: any = {
+            student_id: selectedStudent.id,
+            book_id: item.bookId,
+            quantity: item.quantity,
+            unit_price: item.price,
+          };
+          
+          // Use the shared receipt number for all purchases in this transaction
+          if (sharedReceiptNumber) {
+            purchaseData.receipt_number = sharedReceiptNumber;
+          }
+          
+          console.log('Purchase data:', purchaseData);
+          
+          // API call will throw an error if it fails, so we catch it
+          const response = await api.createPurchase(purchaseData);
+          
+          console.log('Purchase response:', response);
+
+          // If we get here, the API call succeeded
+          if (response && response.data) {
+            purchases.push(response.data);
+            
+            // Store the receipt number from the first purchase to use for the rest
+            if (!sharedReceiptNumber && response.data.receipt_number) {
+              sharedReceiptNumber = response.data.receipt_number;
+              console.log('Using receipt number for transaction:', sharedReceiptNumber);
+            }
+            
+            console.log('Purchase created successfully:', response.data);
+          } else {
+            console.error('Purchase response missing data:', response);
+            errors.push(`${item.title}: Invalid response from server`);
+          }
+        } catch (error: any) {
+          console.error('Purchase error for item:', item.title, error);
+          const errorMsg = error?.message || error?.toString() || 'Unknown error occurred';
+          console.error('Error details:', {
+            message: errorMsg,
+            error: error,
+            item: item.title
+          });
+          errors.push(`${item.title}: ${errorMsg}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        console.error('Purchase errors:', errors);
+        setPurchaseError(`Some purchases failed: ${errors.join('; ')}`);
+        setIsProcessingPurchase(false);
+        return;
+      }
+
+      if (purchases.length === 0) {
+        console.error('No purchases were created');
+        setPurchaseError('No purchases were created. Please try again.');
+        setIsProcessingPurchase(false);
+        return;
+      }
+
+      console.log('All purchases created successfully. Refreshing inventory...');
+      
+      // Refresh inventory to show updated stock
+      try {
+        await refreshBooks();
+        console.log('Inventory refreshed');
+      } catch (refreshError) {
+        console.error('Error refreshing inventory:', refreshError);
+        // Don't fail the purchase if inventory refresh fails
+      }
+
+      // Create receipt from purchases (they all have the same receipt number and student)
+      const firstPurchase = purchases[0];
+      const receiptNumber = sharedReceiptNumber || firstPurchase?.receipt_number || `RCPT${receiptIdRef.current++}`;
+      
+      const receipt = {
+        id: receiptNumber,
+        date: new Date().toLocaleString(),
+        student: selectedStudent,
+        items: cart,
+        subtotal,
+        discountType,
+        discountValue,
+        discountAmount,
+        total,
+        payments,
+        purchases, // Store all purchase records
+      };
+      
+      console.log('Receipt created:', receipt);
+      
+      setLastReceipt(receipt);
+      setShowReceiptModal(true);
+      
+      // Clear cart and reset form
+      setCart([]);
+      setDiscountValue(0);
+      setDiscountType('percent');
+      setPayments([{ method: 'cash', amount: 0, reference: '' }]);
+      setPurchaseError(null);
+    } catch (error: any) {
+      console.error('Purchase process error:', error);
+      const errorMsg = error?.message || error?.toString() || 'Failed to complete purchase';
+      setPurchaseError(errorMsg);
+    } finally {
+      setIsProcessingPurchase(false);
+    }
   };
 
   // WhatsApp message generator
@@ -544,7 +735,7 @@ const StudentPurchasePage: React.FC = () => {
                     <Package className="h-4 w-4 mr-2" />
               Add {selectedStudent ? selectedStudent.class : ''} Bundle
                   </Button>
-            <Button size="sm" onClick={() => setShowBookModal(true)} disabled={!selectedStudent}>
+            <Button size="sm" onClick={() => setShowBookModal(true)} disabled={!selectedStudent || books.length === 0}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Book
                 </Button>
@@ -682,10 +873,22 @@ const StudentPurchasePage: React.FC = () => {
               )}
             </div>
           </div>
+          {/* Purchase Error Display */}
+          {purchaseError && (
+            <div className="pt-4">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {purchaseError}
+              </div>
+            </div>
+          )}
+          
           {/* Complete Purchase Button */}
           <div className="pt-6 flex justify-end">
-            <Button disabled={!isPaymentValid || cart.length === 0} onClick={handleCompletePurchase}>
-              Complete Purchase
+            <Button 
+              disabled={!isPaymentValid || cart.length === 0 || isProcessingPurchase || !selectedStudent} 
+              onClick={handleCompletePurchase}
+            >
+              {isProcessingPurchase ? 'Processing...' : 'Complete Purchase'}
             </Button>
           </div>
         </Card>
@@ -898,8 +1101,10 @@ const StudentPurchasePage: React.FC = () => {
                   <div>
                     <h4 className="font-medium text-gray-900">{book.title}</h4>
                   <p className="text-sm text-gray-600">{book.class}</p>
-                    <p className="text-xs text-gray-500">Stock: {book.stock}</p>
-                  <p className="text-xs text-gray-500">₵{book.price}</p>
+                    <p className={`text-xs ${book.stock === 0 ? 'text-red-500' : book.stock <= 5 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                      Stock: {book.stock}
+                    </p>
+                  <p className="text-xs text-gray-500">₵{book.price.toFixed(2)}</p>
                 </div>
                 <div className="flex items-center space-x-2 mt-2">
                   <Input
@@ -907,19 +1112,20 @@ const StudentPurchasePage: React.FC = () => {
                     min={1}
                     max={book.stock}
                     value={bookQty}
-                    onChange={(e) => setBookQty(Number(e.target.value))}
+                    onChange={(e) => setBookQty(Math.min(Number(e.target.value), book.stock))}
                     className="w-16"
                     disabled={book.stock === 0}
                   />
                 <Button
                   size="sm"
                     onClick={() => handleAddBookToCart(book, bookQty)}
-                  disabled={book.stock === 0}
+                  disabled={book.stock === 0 || bookQty < 1 || bookQty > book.stock}
                 >
                     <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
                 </div>
                 {book.stock === 0 && <div className="text-xs text-red-500 mt-1">Out of stock</div>}
+                {book.stock > 0 && book.stock <= 5 && <div className="text-xs text-yellow-600 mt-1">Low stock</div>}
               </div>
             ))}
           </div>
@@ -941,7 +1147,7 @@ const StudentPurchasePage: React.FC = () => {
               onChange={(e) => setAddBookId(e.target.value)}
             >
               <option value="">Select Book</option>
-              {mockBooks
+              {books
                 .filter(
                   (b) =>
                     !editingBundle.some((eb) => eb.bookId === b.id) &&
@@ -949,7 +1155,7 @@ const StudentPurchasePage: React.FC = () => {
                 )
                 .map((book) => (
                   <option key={book.id} value={book.id}>
-                    {book.title}
+                    {book.subject} ({book.class})
                   </option>
                 ))}
             </select>
@@ -967,11 +1173,12 @@ const StudentPurchasePage: React.FC = () => {
           <div className="space-y-2">
             {editingBundle.length === 0 && <div className="text-gray-400">No books in bundle.</div>}
             {editingBundle.map((item) => {
-              const book = mockBooks.find((b) => b.id === item.bookId);
+              const book = books.find((b) => b.id === item.bookId);
               return (
                 <div key={item.bookId} className="flex items-center justify-between p-2 border rounded">
                   <div>
-                    <div className="font-medium text-gray-900">{book?.title}</div>
+                    <div className="font-medium text-gray-900">{book?.subject || 'Unknown Book'}</div>
+                    <div className="text-xs text-gray-500">{book?.class}</div>
               </div>
                   <div className="flex items-center space-x-2">
                     <Input
