@@ -9,6 +9,7 @@ import {
   Book 
 } from '../types';
 import { useAuth } from './AuthContext';
+import { supabase } from '../config/supabase';
 import toast from 'react-hot-toast';
 
 interface SupplierContextType {
@@ -146,10 +147,10 @@ const mockSupplierPayments: SupplierPayment[] = [
 ];
 
 export const SupplierProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>(mockSupplyOrders);
-  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>(mockSupplierPayments);
-  const [isLoading, setIsLoading] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
