@@ -12,8 +12,14 @@ const Input: React.FC<InputProps> = ({
   error, 
   icon, 
   className,
+  value,
   ...props 
 }) => {
+  // Prevent NaN from being passed to input value
+  const safeValue = value === undefined || value === null || (typeof value === 'number' && isNaN(value))
+    ? ''
+    : value;
+
   return (
     <div className="space-y-1">
       {label && (
@@ -34,6 +40,7 @@ const Input: React.FC<InputProps> = ({
             error && 'border-red-300 focus:ring-red-500 focus:border-red-500',
             className
           )}
+          value={safeValue}
           {...props}
         />
       </div>

@@ -94,8 +94,30 @@ const SuppliersPage: React.FC = () => {
     supplier.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalBalance = suppliers.reduce((sum, supplier) => sum + supplier.balance, 0);
-  const outstandingPayments = suppliers.filter(s => s.balance < 0).reduce((sum, s) => sum + Math.abs(s.balance), 0);
+  // Calculate total balance from supply orders and payments
+  // Total balance = Total supply orders (received) - Total payments
+  const totalSupplies = supplyOrders
+    .filter(order => order.status === 'received')
+    .reduce((sum, order) => sum + order.totalAmount, 0);
+  const totalPayments = supplierPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalBalance = totalSupplies - totalPayments;
+
+  // Calculate outstanding payments (received orders that haven't been fully paid)
+  // For each supplier, calculate: received orders - payments
+  const outstandingPayments = suppliers.reduce((total, supplier) => {
+    const supplierOrders = supplyOrders.filter(order => 
+      order.supplierId === supplier.id && order.status === 'received'
+    );
+    const supplierPaymentsList = supplierPayments.filter(payment => 
+      payment.supplierId === supplier.id
+    );
+    const supplierTotalSupplies = supplierOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const supplierTotalPayments = supplierPaymentsList.reduce((sum, payment) => sum + payment.amount, 0);
+    const supplierOutstanding = supplierTotalSupplies - supplierTotalPayments;
+    // Only count positive outstanding (money owed to supplier)
+    return total + Math.max(0, supplierOutstanding);
+  }, 0);
+
   const overduePayments = getOverduePayments();
 
   const handleAddSupplier = () => {
@@ -127,68 +149,112 @@ const SuppliersPage: React.FC = () => {
     }
   };
 
-  const handleAddSupply = () => {
-    if (!supplyForm.supplierId || supplyForm.items.length === 0) {
-      toast.error('Please select supplier and add items');
+  const handleAddSupply = async () => {
+    if (!supplyForm.supplierId) {
+      toast.error('Please select a supplier');
+      return;
+    }
+    
+    // Validate that at least one item has a book selected
+    const validItems = supplyForm.items.filter(item => item.bookId && item.quantity > 0 && item.costPrice > 0);
+    if (validItems.length === 0) {
+      toast.error('Please add at least one item with a book selected, quantity, and cost price');
+      return;
+    }
+
+    if (!supplyForm.supplyDate) {
+      toast.error('Please select a supply date');
       return;
     }
     
     const supplier = suppliers.find(s => s.id === supplyForm.supplierId);
-    if (!supplier) return;
+    if (!supplier) {
+      toast.error('Supplier not found');
+      return;
+    }
     
-    const totalAmount = supplyForm.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
+    // Calculate total amount from valid items only
+    const totalAmount = validItems.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.costPrice) || 0;
+      return sum + (qty * price);
+    }, 0);
     
-    addSupplyOrder({
-      supplierId: supplyForm.supplierId,
-      supplierName: supplier.name,
-      items: supplyForm.items,
-      totalAmount,
-      invoiceNumber: supplyForm.invoiceNumber,
-      supplyDate: supplyForm.supplyDate,
-      expectedPaymentDate: supplyForm.expectedPaymentDate,
-      status: 'pending',
-      notes: supplyForm.notes
-    });
-    
-    setShowSupplyModal(false);
-    setSupplyForm({
-      supplierId: '',
-      invoiceNumber: '',
-      supplyDate: '',
-      expectedPaymentDate: '',
-      notes: '',
-      items: [{ bookId: '', bookTitle: '', quantity: 1, costPrice: 0, total: 0 }]
-    });
+    try {
+      await addSupplyOrder({
+        supplierId: supplyForm.supplierId,
+        supplierName: supplier.name,
+        items: validItems,
+        totalAmount,
+        invoiceNumber: supplyForm.invoiceNumber || undefined,
+        supplyDate: supplyForm.supplyDate,
+        expectedPaymentDate: supplyForm.expectedPaymentDate || undefined,
+        status: 'pending',
+        notes: supplyForm.notes || undefined
+      });
+      
+      setShowSupplyModal(false);
+      setSupplyForm({
+        supplierId: '',
+        invoiceNumber: '',
+        supplyDate: '',
+        expectedPaymentDate: '',
+        notes: '',
+        items: [{ bookId: '', bookTitle: '', quantity: 1, costPrice: 0, total: 0 }]
+      });
+    } catch (error) {
+      // Error is already handled in addSupplyOrder
+      console.error('Error adding supply order:', error);
+    }
   };
 
-  const handleAddPayment = () => {
-    if (!paymentForm.supplierId || paymentForm.amount <= 0) {
-      toast.error('Please select supplier and enter amount');
+  const handleAddPayment = async () => {
+    if (!paymentForm.supplierId) {
+      toast.error('Please select a supplier');
+      return;
+    }
+
+    if (!paymentForm.paymentDate) {
+      toast.error('Please select a payment date');
+      return;
+    }
+    
+    const amount = Number(paymentForm.amount) || 0;
+    if (amount <= 0) {
+      toast.error('Please enter a valid payment amount');
       return;
     }
     
     const supplier = suppliers.find(s => s.id === paymentForm.supplierId);
-    if (!supplier) return;
+    if (!supplier) {
+      toast.error('Supplier not found');
+      return;
+    }
     
-    addSupplierPayment({
-      supplierId: paymentForm.supplierId,
-      supplierName: supplier.name,
-      amount: paymentForm.amount,
-      paymentMethod: paymentForm.paymentMethod,
-      reference: paymentForm.reference,
-      paymentDate: paymentForm.paymentDate,
-      notes: paymentForm.notes
-    });
-    
-    setShowPaymentModal(false);
-    setPaymentForm({
-      supplierId: '',
-      amount: 0,
-      paymentMethod: 'bank_transfer',
-      reference: '',
-      paymentDate: '',
-      notes: ''
-    });
+    try {
+      await addSupplierPayment({
+        supplierId: paymentForm.supplierId,
+        supplierName: supplier.name,
+        amount,
+        paymentMethod: paymentForm.paymentMethod,
+        reference: paymentForm.reference || undefined,
+        paymentDate: paymentForm.paymentDate,
+        notes: paymentForm.notes || undefined
+      });
+      
+      setShowPaymentModal(false);
+      setPaymentForm({
+        supplierId: '',
+        amount: 0,
+        paymentMethod: 'bank_transfer',
+        reference: '',
+        paymentDate: '',
+        notes: ''
+      });
+    } catch (error) {
+      // Error is already handled in addSupplierPayment
+      console.error('Error adding payment:', error);
+    }
   };
 
   const addSupplyItem = () => {
@@ -221,7 +287,9 @@ const SuppliersPage: React.FC = () => {
         
         // Update total when quantity or costPrice changes
         if (field === 'quantity' || field === 'costPrice') {
-          updatedItem.total = updatedItem.quantity * updatedItem.costPrice;
+          const qty = Number(updatedItem.quantity) || 0;
+          const price = Number(updatedItem.costPrice) || 0;
+          updatedItem.total = qty * price;
         }
         
         return updatedItem;
@@ -888,20 +956,26 @@ const SuppliersPage: React.FC = () => {
                   <Input 
                     label="Quantity"
                     type="number"
-                    value={item.quantity}
-                    onChange={(e) => updateSupplyItem(index, 'quantity', parseInt(e.target.value))}
+                    value={item.quantity || ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                      updateSupplyItem(index, 'quantity', isNaN(val) ? 0 : val);
+                    }}
                     placeholder="Qty"
                   />
                   <Input 
                     label="Cost Price"
                     type="number"
-                    value={item.costPrice}
-                    onChange={(e) => updateSupplyItem(index, 'costPrice', parseFloat(e.target.value))}
+                    value={item.costPrice || ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                      updateSupplyItem(index, 'costPrice', isNaN(val) ? 0 : val);
+                    }}
                     placeholder="Price"
                   />
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium">
-                      ₵{(item.quantity * item.costPrice).toLocaleString()}
+                      ₵{((item.quantity || 0) * (item.costPrice || 0)).toLocaleString()}
                     </span>
                     {supplyForm.items.length > 1 && (
                       <button
@@ -959,8 +1033,11 @@ const SuppliersPage: React.FC = () => {
             <Input 
               label="Amount *" 
               type="number"
-              value={paymentForm.amount}
-              onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+              value={paymentForm.amount || ''}
+              onChange={(e) => {
+                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                setPaymentForm({ ...paymentForm, amount: isNaN(val) ? 0 : val });
+              }}
               placeholder="Enter amount"
             />
             <div>

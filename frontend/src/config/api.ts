@@ -40,12 +40,20 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   });
 
+  const data = await response.json().catch(() => ({ error: 'Network error' }));
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    const errorMsg = data.error || data.message || `HTTP error! status: ${response.status}`;
+    throw new Error(errorMsg);
   }
 
-  return response.json();
+  // Check if response has success: false even with 200 status
+  if (data.success === false) {
+    const errorMsg = data.error || data.message || 'Request failed';
+    throw new Error(errorMsg);
+  }
+
+  return data;
 };
 
 // API methods
@@ -167,6 +175,18 @@ export const api = {
     apiCall(`/api/purchases/${id}`, { method: 'DELETE' }),
 
   // Reports
+  getSalesReport: (params?: URLSearchParams) =>
+    apiCall(`/api/reports/sales${params ? `?${params}` : ''}`),
+  
+  getInventoryReport: (params?: URLSearchParams) =>
+    apiCall(`/api/reports/inventory${params ? `?${params}` : ''}`),
+  
+  getSupplierReport: (params?: URLSearchParams) =>
+    apiCall(`/api/reports/suppliers${params ? `?${params}` : ''}`),
+  
+  getFinanceReport: (params?: URLSearchParams) =>
+    apiCall(`/api/reports/finance${params ? `?${params}` : ''}`),
+  
   getReports: (params?: URLSearchParams) =>
     apiCall(`/api/reports${params ? `?${params}` : ''}`),
   

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   Filter, 
@@ -11,98 +11,68 @@ import {
   User,
   Printer,
   Users,
-  Globe
+  Globe,
+  Loader
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
-import { Purchase } from '../../types';
+import { Purchase, PurchaseItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../config/api';
 import toast from 'react-hot-toast';
 
-const mockReceipts: Purchase[] = [
-  {
-    id: 'RCP001',
-    studentId: '1',
-    studentName: 'Rahul Kumar',
-    items: [
-      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 },
-      { bookId: '2', title: 'Science Basic 9', quantity: 1, price: 140, total: 140 }
-    ],
-    total: 290,
-    discount: 0,
-    paymentMode: 'cash',
-    cashierId: '2',
-    cashierName: 'Sarah Cashier',
-    createdAt: '2024-01-15T10:30:00'
-  },
-  {
-    id: 'RCP002',
-    studentId: '2',
-    studentName: 'Priya Sharma',
-    items: [
-      { bookId: '3', title: 'English Grammar', quantity: 1, price: 120, total: 120 },
-      { bookId: '4', title: 'History Basic 8', quantity: 1, price: 110, total: 110 }
-    ],
-    total: 230,
-    discount: 10,
-    paymentMode: 'upi',
-    cashierId: '2',
-    cashierName: 'Sarah Cashier',
-    createdAt: '2024-01-15T09:15:00'
-  },
-  {
-    id: 'RCP003',
-    studentId: '3',
-    studentName: 'Amit Singh',
-    items: [
-      { bookId: '5', title: 'Geography Basic 7', quantity: 2, price: 95, total: 190 }
-    ],
-    total: 190,
-    discount: 5,
-    paymentMode: 'card',
-    cashierId: '3',
-    cashierName: 'Mike Johnson',
-    createdAt: '2024-01-14T16:45:00'
-  },
-  {
-    id: 'RCP004',
-    studentId: '4',
-    studentName: 'Sneha Patel',
-    items: [
-      { bookId: '1', title: 'Mathematics Basic 9', quantity: 1, price: 150, total: 150 },
-      { bookId: '6', title: 'Physics Basic 6', quantity: 1, price: 180, total: 180 }
-    ],
-    total: 330,
-    discount: 0,
-    paymentMode: 'cash',
-    cashierId: '4',
-    cashierName: 'John Smith',
-    createdAt: '2024-01-14T14:20:00'
-  },
-  {
-    id: 'RCP005',
-    studentId: '5',
-    studentName: 'Kavya Reddy',
-    items: [
-      { bookId: '7', title: 'Chemistry Basic 5', quantity: 1, price: 200, total: 200 }
-    ],
-    total: 200,
-    discount: 15,
-    paymentMode: 'upi',
-    cashierId: '2',
-    cashierName: 'Sarah Cashier',
-    createdAt: '2024-01-13T11:30:00'
-  }
-];
+// Helper function to group purchases by receipt number
+const groupPurchasesByReceipt = (purchases: any[], currentUser: any): Purchase[] => {
+  const receiptMap = new Map<string, any>();
+  
+  purchases.forEach((purchase) => {
+    const receiptNumber = purchase.receipt_number || purchase.id;
+    const student = purchase.students;
+    const book = purchase.books;
+    const cashier = purchase.cashier || currentUser; // Use cashier from purchase or fallback to current user
+    
+    if (!receiptMap.has(receiptNumber)) {
+      receiptMap.set(receiptNumber, {
+        id: receiptNumber,
+        studentId: purchase.student_id,
+        studentName: student?.name || 'Unknown Student',
+        items: [],
+        total: 0,
+        discount: 0, // Discount is not stored in purchases table
+        paymentMode: 'cash' as const, // Default, as payment mode is not stored
+        cashierId: cashier?.id || currentUser?.id || '',
+        cashierName: cashier?.name || currentUser?.name || 'Unknown Cashier',
+        createdAt: purchase.created_at,
+      });
+    }
+    
+    const receipt = receiptMap.get(receiptNumber);
+    const item: PurchaseItem = {
+      bookId: purchase.book_id,
+      title: book?.title || book?.subject || 'Unknown Book',
+      quantity: purchase.quantity,
+      price: Number(purchase.unit_price),
+      total: Number(purchase.total_amount),
+    };
+    
+    receipt.items.push(item);
+    receipt.total += item.total;
+  });
+  
+  return Array.from(receiptMap.values());
+};
 
 const ReceiptsPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   
+  const [receipts, setReceipts] = useState<Purchase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [cashierFilter, setCashierFilter] = useState('all');
   const [selectedReceipt, setSelectedReceipt] = useState<Purchase | null>(null);
@@ -110,17 +80,84 @@ const ReceiptsPage: React.FC = () => {
   const [showResendModal, setShowResendModal] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Get unique cashiers for admin filtering
-  const uniqueCashiers = Array.from(new Set(mockReceipts.map(r => r.cashierName)));
+  // Fetch purchases from API
+  const fetchReceipts = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('limit', '1000'); // Get a large number of purchases
+      params.append('page', '1');
+      
+      // Apply date filter
+      const now = new Date();
+      if (dateFilter === 'today') {
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+        params.append('start_date', today.toISOString());
+      } else if (dateFilter === 'yesterday') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        params.append('start_date', yesterday.toISOString());
+        params.append('end_date', todayStart.toISOString());
+      } else if (dateFilter === 'last_7_days') {
+        const lastWeek = new Date(now);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        lastWeek.setHours(0, 0, 0, 0);
+        params.append('start_date', lastWeek.toISOString());
+      } else if (dateFilter === 'last_30_days') {
+        const lastMonth = new Date(now);
+        lastMonth.setDate(lastMonth.getDate() - 30);
+        lastMonth.setHours(0, 0, 0, 0);
+        params.append('start_date', lastMonth.toISOString());
+      }
+      // If dateFilter is 'all', don't add date filters (get all receipts)
+      
+      const response = await api.getPurchases(params);
+      
+      console.log('Receipts API response:', response);
+      
+      if (response && response.success && response.data) {
+        console.log('Grouping purchases:', response.data.length, 'purchases');
+        const groupedReceipts = groupPurchasesByReceipt(response.data, user);
+        console.log('Grouped receipts:', groupedReceipts.length, 'receipts');
+        setReceipts(groupedReceipts);
+      } else {
+        const errorMsg = response?.error || 'Failed to load receipts';
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (err: any) {
+      console.error('Error fetching receipts:', err);
+      const errorMsg = err.message || 'Failed to load receipts';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, dateFilter]);
 
-  const filteredReceipts = mockReceipts.filter(receipt => {
+  useEffect(() => {
+    fetchReceipts();
+  }, [fetchReceipts]);
+
+  // Get unique cashiers for admin filtering
+  const uniqueCashiers = Array.from(new Set(receipts.map(r => r.cashierName)));
+
+  const filteredReceipts = receipts.filter(receipt => {
     const matchesSearch = receipt.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          receipt.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (isAdmin && receipt.cashierName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesPayment = paymentFilter === 'all' || receipt.paymentMode === paymentFilter;
     const matchesCashier = cashierFilter === 'all' || receipt.cashierName === cashierFilter;
     
-    // Date filtering logic would go here
     return matchesSearch && matchesPayment && matchesCashier;
   });
 
@@ -138,8 +175,39 @@ const ReceiptsPage: React.FC = () => {
     setSelectedReceipt(null);
   };
 
-  const handleExportAll = () => {
-    toast.success('Exporting all receipts...');
+  const handleExportAll = async () => {
+    try {
+      // Export receipts as CSV
+      const headers = ['Receipt ID', 'Date', 'Student', 'Items', 'Total', 'Payment Method', 'Cashier'];
+      const rows = filteredReceipts.map(receipt => [
+        receipt.id,
+        new Date(receipt.createdAt).toLocaleString(),
+        receipt.studentName,
+        receipt.items.map(i => `${i.title} x${i.quantity}`).join('; '),
+        receipt.total.toFixed(2),
+        receipt.paymentMode,
+        receipt.cashierName
+      ]);
+      
+      const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipts_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success('Receipts exported successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export receipts');
+    }
+  };
+
+  const handleRefresh = async () => {
+    await fetchReceipts();
+    toast.success('Receipts refreshed');
   };
 
   const formatDateTime = (dateString: string) => {
@@ -149,6 +217,25 @@ const ReceiptsPage: React.FC = () => {
       time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader className="h-8 w-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-gray-600">Loading receipts...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -167,6 +254,10 @@ const ReceiptsPage: React.FC = () => {
               Global Search
             </Button>
           )}
+          <Button variant="outline" onClick={handleRefresh}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={handleExportAll}>
             <Download className="h-4 w-4 mr-2" />
             Export All
@@ -342,78 +433,86 @@ const ReceiptsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredReceipts.map((receipt) => {
-                const { date, time } = formatDateTime(receipt.createdAt);
-                return (
-                  <tr key={receipt.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{receipt.id}</div>
-                        <div className="text-sm text-gray-500">{date} at {time}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{receipt.studentName}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{receipt.items.length} items</div>
-                      <div className="text-sm text-gray-500">
-                        {receipt.items.slice(0, 2).map(item => item.title).join(', ')}
-                        {receipt.items.length > 2 && '...'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">₵{receipt.total}</div>
-                      {receipt.discount > 0 && (
-                        <div className="text-sm text-green-600">-{receipt.discount}% discount</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
-                        receipt.paymentMode === 'cash' ? 'bg-green-100 text-green-800' :
-                        receipt.paymentMode === 'card' ? 'bg-blue-100 text-blue-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {receipt.paymentMode}
-                      </span>
-                    </td>
-                    {isAdmin && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {receipt.cashierName}
+              {filteredReceipts.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 7 : 6} className="px-6 py-8 text-center text-gray-500">
+                    No receipts found
+                  </td>
+                </tr>
+              ) : (
+                filteredReceipts.map((receipt) => {
+                  const { date, time } = formatDateTime(receipt.createdAt);
+                  return (
+                    <tr key={receipt.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{receipt.id}</div>
+                          <div className="text-sm text-gray-500">{date} at {time}</div>
+                        </div>
                       </td>
-                    )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedReceipt(receipt);
-                          setShowReceiptModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Receipt"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePrintReceipt(receipt)}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Print Receipt"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedReceipt(receipt);
-                          setShowResendModal(true);
-                        }}
-                        className="text-green-600 hover:text-green-900"
-                        title="Resend Receipt"
-                      >
-                        <Mail className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{receipt.studentName}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">{receipt.items.length} items</div>
+                        <div className="text-sm text-gray-500 max-w-xs truncate">
+                          {receipt.items.slice(0, 2).map(item => item.title).join(', ')}
+                          {receipt.items.length > 2 && '...'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">₵{receipt.total.toFixed(2)}</div>
+                        {receipt.discount > 0 && (
+                          <div className="text-sm text-green-600">-{receipt.discount}% discount</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
+                          receipt.paymentMode === 'cash' ? 'bg-green-100 text-green-800' :
+                          receipt.paymentMode === 'card' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {receipt.paymentMode}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {receipt.cashierName}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedReceipt(receipt);
+                            setShowReceiptModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Receipt"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handlePrintReceipt(receipt)}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Print Receipt"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedReceipt(receipt);
+                            setShowResendModal(true);
+                          }}
+                          className="text-green-600 hover:text-green-900"
+                          title="Resend Receipt"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
