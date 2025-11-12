@@ -94,19 +94,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Auth state changed:', event, session?.user?.email);
         
         if (session?.user) {
+          // User signed in
           const userProfile = await fetchUserProfile(session.user.id);
           if (userProfile) {
             setUser(userProfile);
             localStorage.setItem('bookshop_user', JSON.stringify(userProfile));
             localStorage.setItem('bookshop_token', session.access_token);
           }
+          setIsLoading(false);
         } else {
+          // User signed out or no session
           setUser(null);
           localStorage.removeItem('bookshop_user');
           localStorage.removeItem('bookshop_token');
+          setIsLoading(false);
         }
-        
-        setIsLoading(false);
       }
     );
 
@@ -150,22 +152,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async (): Promise<void> => {
     try {
-      setIsLoading(true);
+      // Clear local state immediately for better UX
+      setUser(null);
+      localStorage.removeItem('bookshop_user');
+      localStorage.removeItem('bookshop_token');
       
       // Sign out from Supabase Auth
+      // The onAuthStateChange listener will also handle state cleanup
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Logout error:', error.message);
       }
       
-      // Clear local state
+      // Ensure loading is false
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Ensure state is cleared even on error
       setUser(null);
       localStorage.removeItem('bookshop_user');
       localStorage.removeItem('bookshop_token');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
       setIsLoading(false);
     }
   };
