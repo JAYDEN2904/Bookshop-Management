@@ -25,10 +25,29 @@ const Login: React.FC = () => {
       if (success) {
         toast.success('Welcome back!');
       } else {
-        toast.error(error || 'Invalid credentials. Please try again.');
+        // Error is already set in AuthContext, just show it
+        const errorMessage = error || 'Invalid credentials. Please try again.';
+        toast.error(errorMessage);
+        
+        // If it's a timeout error, provide helpful message
+        if (errorMessage.includes('timeout') || errorMessage.includes('starting up')) {
+          toast('The server may be starting up. Please wait a moment and try again.', {
+            icon: '⏳',
+            duration: 5000,
+          });
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || 'Login failed. Please try again.');
+      const errorMessage = error.message || 'Login failed. Please try again.';
+      toast.error(errorMessage);
+      
+      // If it's a timeout error, provide helpful message
+      if (errorMessage.includes('timeout') || errorMessage.includes('starting up')) {
+        toast('The server may be starting up. Please wait a moment and try again.', {
+          icon: '⏳',
+          duration: 5000,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -51,8 +70,28 @@ const Login: React.FC = () => {
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className={`border rounded-lg p-4 mb-6 ${
+              error.includes('timeout') || error.includes('starting up')
+                ? 'bg-yellow-50 border-yellow-200'
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <p className={`text-sm ${
+                error.includes('timeout') || error.includes('starting up')
+                  ? 'text-yellow-800'
+                  : 'text-red-800'
+              }`}>
+                {error.includes('timeout') || error.includes('starting up') ? (
+                  <>
+                    <strong>Server is starting up:</strong> {error}
+                    <br />
+                    <span className="text-xs mt-1 block">
+                      This is normal for free-tier hosting. Please wait a moment and try again.
+                    </span>
+                  </>
+                ) : (
+                  error
+                )}
+              </p>
             </div>
           )}
 
