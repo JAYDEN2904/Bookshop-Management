@@ -21,11 +21,17 @@ import storageRoutes from './routes/storage';
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
+import { requestTimeout } from './middleware/timeout';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
+// Request timeout middleware (60 seconds for auth, 30 seconds for others)
+// This helps prevent requests from hanging, especially during cold starts
+const REQUEST_TIMEOUT = parseInt(process.env.REQUEST_TIMEOUT || '60000', 10); // 60 seconds default
+
 // Middleware
+app.use(requestTimeout(REQUEST_TIMEOUT));
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
     directives: {

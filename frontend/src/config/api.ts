@@ -1,7 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
+// API timeout configuration (30 seconds for normal requests, 60 seconds for auth)
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const AUTH_TIMEOUT = 60000; // 60 seconds for auth requests (to account for cold starts)
+
 export const apiConfig = {
   baseURL: API_BASE_URL,
+  timeout: DEFAULT_TIMEOUT,
+  authTimeout: AUTH_TIMEOUT,
   endpoints: {
     auth: {
       login: '/api/auth/login',
@@ -21,10 +27,22 @@ export const apiConfig = {
   },
 };
 
-// Helper function to make API calls
-export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+// Helper function to create a timeout promise
+const createTimeoutPromise = (timeout: number): Promise<never> => {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`Request timeout after ${timeout}ms. The server may be starting up. Please try again.`));
+    }, timeout);
+  });
+};
+
+// Helper function to make API calls with timeout
+export const apiCall = async (endpoint: string, options: RequestInit = {}, timeout?: number) => {
   const url = `${apiConfig.baseURL}${endpoint}`;
   const token = localStorage.getItem('bookshop_token');
+  
+  // Determine timeout - use provided timeout, or check if it's an auth endpoint
+  const requestTimeout = timeout || (endpoint.includes('/auth/') ? apiConfig.authTimeout : apiConfig.timeout);
   
   const headers: Record<string, string> = {
     ...apiConfig.headers,
@@ -35,25 +53,52 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
-  const data = await response.json().catch(() => ({ error: 'Network error' }));
+    const response = await Promise.race([
+      fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      }),
+      createTimeoutPromise(requestTimeout),
+    ]);
 
-  if (!response.ok) {
-    const errorMsg = data.error || data.message || `HTTP error! status: ${response.status}`;
-    throw new Error(errorMsg);
+    clearTimeout(timeoutId);
+
+    // Handle response
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+      const errorMsg = errorData.error || errorData.message || `HTTP error! status: ${response.status}`;
+      throw new Error(errorMsg);
+    }
+
+    const data = await response.json().catch(() => ({ error: 'Invalid response format' }));
+
+    // Check if response has success: false even with 200 status
+    if (data.success === false) {
+      const errorMsg = data.error || data.message || 'Request failed';
+      throw new Error(errorMsg);
+    }
+
+    return data;
+  } catch (error: any) {
+    // Handle abort/timeout errors
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      throw new Error(`Request timeout after ${requestTimeout}ms. The server may be starting up. Please try again.`);
+    }
+    
+    // Handle network errors
+    if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+      throw new Error('Network error: Unable to connect to the server. Please check your connection and try again.');
+    }
+    
+    // Re-throw other errors
+    throw error;
   }
-
-  // Check if response has success: false even with 200 status
-  if (data.success === false) {
-    const errorMsg = data.error || data.message || 'Request failed';
-    throw new Error(errorMsg);
-  }
-
-  return data;
 };
 
 // API methods

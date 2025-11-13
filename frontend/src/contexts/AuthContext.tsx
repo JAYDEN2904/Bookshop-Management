@@ -1,12 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { apiCall } from '../config/api';
 import apiConfig from '../config/api';
-
-// Create Supabase client
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 export interface User {
   id: string;
@@ -21,6 +15,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (email: string, password: string, name: string, role?: string) => Promise<boolean>;
@@ -39,111 +34,89 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch user profile from backend
-  const fetchUserProfile = async (authUserId: string): Promise<User | null> => {
+  // Fetch user profile from backend using stored token
+  const fetchUserProfile = async (): Promise<User | null> => {
     try {
-      const response = await fetch(`${apiConfig.baseURL}${apiConfig.endpoints.auth.me}`, {
+      const token = localStorage.getItem('bookshop_token');
+      if (!token) {
+        return null;
+      }
+
+      const data = await apiCall(apiConfig.endpoints.auth.me, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.user) {
-          return data.user;
-        }
+      if (data.success && data.user) {
+        return data.user;
       }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching user profile:', error);
+      // If token is invalid, clear it
+      if (error.message?.includes('401') || error.message?.includes('Invalid token')) {
+        localStorage.removeItem('bookshop_token');
+        localStorage.removeItem('bookshop_user');
+      }
       return null;
     }
   };
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    // Check for existing session on mount
+    const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          const userProfile = await fetchUserProfile(session.user.id);
+        const storedUser = localStorage.getItem('bookshop_user');
+        const token = localStorage.getItem('bookshop_token');
+
+        if (storedUser && token) {
+          // Verify token is still valid by fetching user profile
+          const userProfile = await fetchUserProfile();
           if (userProfile) {
             setUser(userProfile);
-            // Store in localStorage for persistence
+            // Update stored user data
             localStorage.setItem('bookshop_user', JSON.stringify(userProfile));
-            localStorage.setItem('bookshop_token', session.access_token);
+          } else {
+            // Token invalid, clear storage
+            localStorage.removeItem('bookshop_user');
+            localStorage.removeItem('bookshop_token');
+            setUser(null);
           }
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        console.error('Error checking session:', error);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        if (session?.user) {
-          // User signed in
-          const userProfile = await fetchUserProfile(session.user.id);
-          if (userProfile) {
-            setUser(userProfile);
-            localStorage.setItem('bookshop_user', JSON.stringify(userProfile));
-            localStorage.setItem('bookshop_token', session.access_token);
-          }
-          setIsLoading(false);
-        } else {
-          // User signed out or no session
-          setUser(null);
-          localStorage.removeItem('bookshop_user');
-          localStorage.removeItem('bookshop_token');
-          setIsLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    checkSession();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Sign in with Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Use backend API directly - it handles Supabase auth and user profile in one call
+      const data = await apiCall(apiConfig.endpoints.auth.login, {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }, apiConfig.authTimeout);
 
-      if (error) {
-        console.error('Login error:', error.message);
-        return false;
-      }
-
-      if (data.user && data.session) {
-        // Fetch user profile from backend
-        const userProfile = await fetchUserProfile(data.user.id);
-        if (userProfile) {
-          setUser(userProfile);
-          localStorage.setItem('bookshop_user', JSON.stringify(userProfile));
-          localStorage.setItem('bookshop_token', data.session.access_token);
-          return true;
-        }
+      if (data.success && data.user && data.token) {
+        setUser(data.user);
+        localStorage.setItem('bookshop_user', JSON.stringify(data.user));
+        localStorage.setItem('bookshop_token', data.token);
+        return true;
       }
       
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      setError(error.message || 'Login failed. Please try again.');
       return false;
     } finally {
       setIsLoading(false);
@@ -152,27 +125,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async (): Promise<void> => {
     try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Try to call backend logout endpoint (optional, but good practice)
+      try {
+        await apiCall(apiConfig.endpoints.auth.logout, {
+          method: 'POST',
+        });
+      } catch (error) {
+        // Ignore logout errors - we'll clear local state anyway
+        console.warn('Logout API call failed, clearing local state:', error);
+      }
+      
       // Clear local state immediately for better UX
       setUser(null);
       localStorage.removeItem('bookshop_user');
       localStorage.removeItem('bookshop_token');
-      
-      // Sign out from Supabase Auth
-      // The onAuthStateChange listener will also handle state cleanup
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Logout error:', error.message);
-      }
-      
-      // Ensure loading is false
-      setIsLoading(false);
     } catch (error) {
       console.error('Logout error:', error);
       // Ensure state is cleared even on error
       setUser(null);
       localStorage.removeItem('bookshop_user');
       localStorage.removeItem('bookshop_token');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -180,31 +156,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (email: string, password: string, name: string, role: string = 'CASHIER'): Promise<boolean> => {
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Register with Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name
-          }
-        }
-      });
+      // Use backend API for registration
+      const data = await apiCall('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, name, role }),
+      }, apiConfig.authTimeout);
 
-      if (error) {
-        console.error('Registration error:', error.message);
-        return false;
-      }
-
-      if (data.user) {
-        // Registration successful - user will need to confirm email
+      if (data.success) {
         return true;
       }
       
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
+      setError(error.message || 'Registration failed. Please try again.');
       return false;
     } finally {
       setIsLoading(false);
@@ -214,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = {
     user,
     isLoading,
+    error,
     login,
     logout,
     register,
