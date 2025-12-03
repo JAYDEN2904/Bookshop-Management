@@ -268,3 +268,10 @@ ALTER TABLE purchases
 - Payment method and discount are not stored (defaults used)
 - Date filtering works based on `created_at` timestamp
 
+
+
+
+
+
+
+

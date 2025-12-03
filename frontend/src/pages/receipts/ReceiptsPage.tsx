@@ -37,6 +37,7 @@ const groupPurchasesByReceipt = (purchases: any[], currentUser: any): Purchase[]
       receiptMap.set(receiptNumber, {
         id: receiptNumber,
         studentId: purchase.student_id,
+        actualStudentId: student?.student_id || 'N/A', // Actual student ID (e.g., "ST001")
         studentName: student?.name || 'Unknown Student',
         items: [],
         total: 0,
@@ -164,8 +165,379 @@ const ReceiptsPage: React.FC = () => {
   const totalAmount = filteredReceipts.reduce((sum, receipt) => sum + receipt.total, 0);
   const totalTransactions = filteredReceipts.length;
 
-  const handlePrintReceipt = (receipt: Purchase) => {
-    toast.success(`Printing receipt ${receipt.id}`);
+  const handlePrintReceipt = (receipt: Purchase & { actualStudentId?: string }) => {
+    const { date, time } = formatDateTime(receipt.createdAt);
+    const subtotal = receipt.items.reduce((sum, item) => sum + item.total, 0);
+    const discountAmount = receipt.discount > 0 
+      ? Math.round((subtotal * receipt.discount) / 100) 
+      : 0;
+    const actualStudentId = (receipt as any).actualStudentId || 'N/A';
+
+    // Create print window
+    const printWindow = window.open('', '_blank', 'width=600,height=800');
+    if (!printWindow) {
+      toast.error('Please allow popups to print receipts');
+      return;
+    }
+
+    // Generate HTML for compact A6 receipt (105mm × 148mm)
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Receipt ${receipt.id}</title>
+          <style>
+            @page {
+              size: A6;
+              margin: 5mm;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Arial', 'Helvetica', sans-serif;
+              color: #000;
+              background: #fff;
+              line-height: 1.3;
+              font-size: 8pt;
+              width: 95mm;
+              height: 138mm;
+              overflow: hidden;
+            }
+            .receipt-container {
+              width: 100%;
+              padding: 3mm;
+            }
+            .header {
+              border-bottom: 2px solid #000;
+              padding-bottom: 3mm;
+              margin-bottom: 3mm;
+            }
+            .header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 2mm;
+            }
+            .school-info {
+              flex: 1;
+            }
+            .school-name {
+              font-size: 11pt;
+              font-weight: bold;
+              letter-spacing: 0.5px;
+              margin-bottom: 1mm;
+              text-transform: uppercase;
+            }
+            .school-tagline {
+              font-size: 7pt;
+              font-style: italic;
+              color: #333;
+            }
+            .receipt-number {
+              text-align: right;
+              border: 1px solid #000;
+              padding: 2mm 3mm;
+            }
+            .receipt-label {
+              font-size: 6pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 1mm;
+            }
+            .receipt-id {
+              font-size: 9pt;
+              font-weight: bold;
+              font-family: 'Courier New', monospace;
+            }
+            .info-section {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 3mm;
+              padding: 2mm 0;
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+              font-size: 7pt;
+            }
+            .info-column {
+              flex: 1;
+              padding: 0 2mm;
+            }
+            .info-column:first-child {
+              border-right: 1px solid #000;
+              padding-left: 0;
+            }
+            .info-column:last-child {
+              padding-right: 0;
+            }
+            .info-label {
+              font-size: 6pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 1mm;
+              color: #333;
+            }
+            .info-value {
+              font-size: 7pt;
+              margin-bottom: 2mm;
+              line-height: 1.4;
+            }
+            .items-section {
+              margin-bottom: 3mm;
+            }
+            .section-title {
+              font-size: 7pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 2mm;
+              border-bottom: 1px solid #000;
+              padding-bottom: 1mm;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 2mm;
+              font-size: 7pt;
+            }
+            .items-table thead {
+              background-color: #f5f5f5;
+            }
+            .items-table th {
+              padding: 1.5mm 1mm;
+              text-align: left;
+              font-weight: bold;
+              font-size: 6pt;
+              text-transform: uppercase;
+              border-bottom: 1px solid #000;
+              border-top: 1px solid #000;
+            }
+            .items-table th:last-child,
+            .items-table td:last-child {
+              text-align: right;
+            }
+            .items-table th:nth-child(2),
+            .items-table td:nth-child(2),
+            .items-table th:nth-child(3),
+            .items-table td:nth-child(3),
+            .items-table th:nth-child(4),
+            .items-table td:nth-child(4) {
+              text-align: right;
+            }
+            .items-table td {
+              padding: 1.5mm 1mm;
+              border-bottom: 0.5px solid #ddd;
+              font-size: 7pt;
+              word-wrap: break-word;
+            }
+            .items-table td:first-child {
+              max-width: 40mm;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .items-table tbody tr:last-child td {
+              border-bottom: 1px solid #000;
+            }
+            .totals-section {
+              margin-top: 2mm;
+              margin-bottom: 2mm;
+            }
+            .totals-table {
+              width: 100%;
+              max-width: 50mm;
+              margin-left: auto;
+              border-collapse: collapse;
+              font-size: 7pt;
+            }
+            .totals-table td {
+              padding: 1mm 2mm;
+            }
+            .totals-table td:first-child {
+              text-align: right;
+              font-weight: normal;
+              border-right: 0.5px solid #ddd;
+            }
+            .totals-table td:last-child {
+              text-align: right;
+              font-weight: bold;
+            }
+            .totals-table .subtotal-row td {
+              border-top: 0.5px solid #ddd;
+            }
+            .totals-table .discount-row td {
+              color: #333;
+            }
+            .totals-table .total-row {
+              border-top: 1.5px solid #000;
+              border-bottom: 1.5px solid #000;
+            }
+            .totals-table .total-row td {
+              font-size: 9pt;
+              font-weight: bold;
+              padding: 2mm;
+            }
+            .payment-section {
+              margin-top: 2mm;
+              padding: 2mm;
+              border: 1.5px solid #000;
+              background-color: #f9f9f9;
+            }
+            .payment-label {
+              font-size: 6pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 1mm;
+            }
+            .payment-value {
+              font-size: 8pt;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .footer {
+              margin-top: 3mm;
+              padding-top: 2mm;
+              border-top: 1px solid #000;
+              text-align: center;
+              font-size: 6pt;
+              color: #333;
+            }
+            .footer-line {
+              margin: 1mm 0;
+            }
+            .thank-you {
+              margin-top: 2mm;
+              text-align: center;
+              font-size: 7pt;
+              font-style: italic;
+              font-weight: bold;
+            }
+            @media print {
+              body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+                width: 95mm;
+                height: 138mm;
+              }
+              .receipt-container {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-container">
+            <!-- Header -->
+            <div class="header">
+              <div class="header-top">
+                <div class="school-info">
+                  <div class="school-name">School Bookshop</div>
+                  <div class="school-tagline">Official Receipt</div>
+                </div>
+                <div class="receipt-number">
+                  <div class="receipt-label">Receipt #</div>
+                  <div class="receipt-id">${receipt.id}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Information Section -->
+            <div class="info-section">
+              <div class="info-column">
+                <div class="info-label">Billed To</div>
+                <div class="info-value">
+                  <strong>${receipt.studentName}</strong><br>
+                  ID: ${actualStudentId}
+                </div>
+                <div class="info-label">Date & Time</div>
+                <div class="info-value">${date}<br>${time}</div>
+              </div>
+              <div class="info-column">
+                <div class="info-label">Cashier</div>
+                <div class="info-value">
+                  <strong>${receipt.cashierName}</strong>
+                </div>
+                <div class="info-label">Payment</div>
+                <div class="info-value">${receipt.paymentMode.toUpperCase()}</div>
+              </div>
+            </div>
+
+            <!-- Items Section -->
+            <div class="items-section">
+              <div class="section-title">Items</div>
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${receipt.items.map((item: PurchaseItem) => `
+                    <tr>
+                      <td>${item.title}</td>
+                      <td>${item.quantity}</td>
+                      <td>₵${item.price.toFixed(2)}</td>
+                      <td>₵${item.total.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Totals Section -->
+            <div class="totals-section">
+              <table class="totals-table">
+                <tr class="subtotal-row">
+                  <td>Subtotal:</td>
+                  <td>₵${subtotal.toFixed(2)}</td>
+                </tr>
+                ${receipt.discount > 0 ? `
+                <tr class="discount-row">
+                  <td>Discount (${receipt.discount}%):</td>
+                  <td>-₵${discountAmount.toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                <tr class="total-row">
+                  <td>TOTAL:</td>
+                  <td>₵${receipt.total.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Payment Section -->
+            <div class="payment-section">
+              <div class="payment-label">Payment Method</div>
+              <div class="payment-value">${receipt.paymentMode.toUpperCase()}</div>
+            </div>
+
+            <!-- Thank You Message -->
+            <div class="thank-you">
+              Thank you for your purchase!
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <div class="footer-line">Official Receipt - Keep for your records</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
+
+    toast.success('Opening print preview...');
   };
 
   const handleResendReceipt = () => {

@@ -127,3 +127,10 @@ The `update_book_stock` RPC function (in `backend/supabase-schema.sql`):
 - `frontend/src/pages/purchase/StudentPurchasePage.tsx` - Needs API integration
 - Consider creating a `PurchaseContext` for better state management
 
+
+
+
+
+
+
+

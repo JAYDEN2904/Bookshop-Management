@@ -15,3 +15,10 @@ CREATE INDEX IF NOT EXISTS idx_purchases_receipt_number ON purchases(receipt_num
 -- Note: Existing purchases will have NULL cashier_id
 -- New purchases will automatically include the cashier_id from the authenticated user
 
+
+
+
+
+
+
+

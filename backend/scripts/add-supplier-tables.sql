@@ -79,3 +79,10 @@ FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Admins can manage supplier payments" ON supplier_payments
 FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
+
+
+
+
+
+
+
